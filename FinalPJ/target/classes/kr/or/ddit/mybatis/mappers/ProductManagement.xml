@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.product.dao.ProductManagementDAO">
+	<select id="productList" resultType="kr.or.ddit.vo.ProductManagementVO">
+		SELECT MEDICINE_KEY, MEDICINE_NAME, MEDICINE_REMINDER, MEDICINE_EA, MEDICINE_COMPANY_NAME, MEDICINE_ROUTE, MEDICINE_COST
+		FROM MEDICINE
+	</select>
+	
+	<delete id="deleteOrder" parameterType="string">
+		DELETE FROM PRODUCT_ORDER_RECORD
+		WHERE ORDER_REQUEST_NO=#{orderRequestNo}
+	</delete>
+	
+	<delete id="suppliesOrderRecord" parameterType="string">
+		DELETE FROM OFFICE_SUPPLIES_ORDER_RECORD
+		WHERE RECORD_KEY=#{recordKey}
+	</delete>
+</mapper>

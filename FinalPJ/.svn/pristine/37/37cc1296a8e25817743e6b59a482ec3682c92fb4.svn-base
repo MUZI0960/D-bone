@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.emp.dao.EmpDAO">
+	<!-- 사원 추가하기 -->
+	<insert id="insertEmp" parameterType="kr.or.ddit.vo.EmpVO">
+		INSERT INTO EMP (
+		EMP_KEY,
+		EMP_ID,
+		EMP_PASS,
+		EMP_NAME,
+		EMP_AGE,
+		EMP_JOB,
+		EMP_REGNO1,
+		EMP_REGNO2,
+		EMP_PHONE,
+		EMP_ADDR,
+		EMP_ADDR_DETAIL,
+		EMP_HIRE_DATE,
+		EMP_RETIRE_DATE,
+		EMP_RETIRE_CHECK,
+		EMP_FILE_GROUP_NO,
+		EMP_LICENSE_NO
+		) VALUES ('E' || LPAD(EMP_SEQ.NEXTVAL,5,'0')
+		,#{empId,jdbcType=VARCHAR }
+		,#{empPass,jdbcType=VARCHAR}
+		,#{empName,jdbcType=VARCHAR }
+		,EXTRACT(YEAR FROM SYSDATE) - 
+	        CASE WHEN SUBSTR(#{empRegno1}, 1, 1) IN ('0', '1')
+	             THEN TO_NUMBER(SUBSTR(#{empRegno1}, 1, 2)) + 2000
+	             ELSE TO_NUMBER(SUBSTR(#{empRegno1}, 1, 2)) + 1900
+	        END
+		,#{empJob,jdbcType=VARCHAR }
+		,#{empRegno1,jdbcType=NUMERIC }
+		,#{empRegno2,jdbcType=NUMERIC }
+		,#{empPhone,jdbcType=VARCHAR }
+		,#{empAddr,jdbcType=VARCHAR }
+		,#{empAddrDetail }
+		,SYSDATE
+		,#{empRetireDate,jdbcType=DATE}
+		,#{empRetireCheck,jdbcType=VARCHAR }
+		,#{empFileGroupNo,jdbcType=NUMERIC }
+		,#{empLicenseNo,jdbcType=NUMERIC }
+		)
+	</insert>
+
+	 
+	 <select id="selectempList" resultType="kr.or.ddit.vo.EmpVO">
+	 	SELECT
+		EMP_KEY,
+		EMP_ID,
+		EMP_PASS,
+		EMP_NAME,
+		EMP_AGE,
+		EMP_JOB,
+		EMP_REGNO1,
+		EMP_REGNO2,
+		EMP_PHONE,
+		EMP_ADDR,
+		EMP_ADDR_DETAIL,
+		EMP_HIRE_DATE,
+		EMP_RETIRE_DATE,
+		EMP_RETIRE_CHECK,
+		EMP_FILE_GROUP_NO,
+		EMP_LICENSE_NO
+		FROM
+		EMP
+		ORDER BY EMP_KEY DESC
+	 </select>
+
+	<update id="updateEmp" parameterType="kr.or.ddit.vo.EmpVO">
+		UPDATE EMP SET
+	        EMP_ID=#{empId, jdbcType=VARCHAR} 
+			,EMP_PHONE=#{empPhone, jdbcType=VARCHAR}
+			,EMP_ADDR=#{empAddr, jdbcType=VARCHAR}
+			,EMP_ADDR_DETAIL=#{empAddrDetail, jdbcType=VARCHAR}
+	        ,EMP_FILE_GROUP_NO=#{empFileGroupNo, jdbcType=NUMERIC}
+			WHERE EMP_KEY=#{empKey, jdbcType=VARCHAR}
+	</update>
+
+	<!-- 시큐리티를 위한 -->
+	<select id="selectEmpSecurity" parameterType="string"
+		resultType="kr.or.ddit.vo.EmpVO">
+		SELECT
+		A.EMP_KEY, A.EMP_ID, A.EMP_PASS, A.EMP_NAME, A.EMP_AGE, A.EMP_JOB, A.EMP_REGNO1
+		, A.EMP_REGNO2
+		, A.EMP_PHONE, A.EMP_ADDR, A.EMP_ADDR_DETAIL, A.EMP_HIRE_DATE ,
+		A.EMP_RETIRE_DATE, A.EMP_RETIRE_CHECK
+		, A.EMP_FILE_GROUP_NO, A.EMP_LICENSE_NO
+		, B.CODE, B.CODE_NAME , C.OFFICE_KEY , X.CODE_NAME AS OFFICE_NAME
+		FROM EMP A LEFT OUTER JOIN COMMON_CODE B ON (A.EMP_JOB = B.CODE )
+		LEFT OUTER JOIN DOCTOR_OFFICE C ON (A.EMP_KEY = C.EMP_KEY)
+		LEFT OUTER JOIN COMMON_CODE X ON(X.CODE = C.OFFICE_KEY)
+		WHERE EMP_ID = #{empId}
+	</select>
+	
+	<select id="selectEmp" parameterType="string" resultType="kr.or.ddit.vo.EmpVO">
+		SELECT * FROM EMP
+		WHERE EMP_KEY= #{empKey}
+	</select>
+	
+</mapper>

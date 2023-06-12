@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.patient.dao.PatientDAO">
+	<resultMap type="kr.or.ddit.vo.PatientVO" id="patientMap" autoMapping="true">
+		<id property="patientKey" column="PATIENT_KEY"/>
+		<association property="preDiagnosis" javaType="kr.or.ddit.vo.PreDiagnosisVO" autoMapping="true" />
+		<association property="guardian" javaType="kr.or.ddit.vo.GuardianVO" autoMapping="true" />
+		<association property="receiption" javaType="kr.or.ddit.vo.ReceiptionVO" autoMapping="true" /> <!-- 정민-수납대기환자뽑기 -->
+		<association property="pay" javaType="kr.or.ddit.vo.PayVO" autoMapping="true" /> <!-- 정민-수납대기환자뽑기 -->
+		<association property="payDetail" javaType="kr.or.ddit.vo.PayDetailVO" autoMapping="true" /> <!-- 정민 -->
+		<association property="disease" javaType="kr.or.ddit.vo.DiseaseVO" autoMapping="true" /> <!-- 정민 -->
+		<association property="chart" javaType="kr.or.ddit.vo.MedicalChartVO" autoMapping="true" /> <!-- 정민 -->
+		<association property="historyVO" javaType="kr.or.ddit.vo.WaitingHistoryVO" autoMapping="true" /> <!-- 정민 -->
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.PayVO" id="payMap" autoMapping="true">
+		<id property="payKey" column="PAY_KEY"/>
+		<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true"/>
+	</resultMap>
+	
+
+	<!-- 환자 목록 조회 셀렉트문 -->
+	<select id="selectPatientList" resultMap="patientMap">
+		SELECT
+			  A.PATIENT_KEY, A.PATIENT_NAME, A.PATIENT_AGE
+				, A.PATIENT_SEX, A.PATIENT_REGNO1, A.PATIENT_REGNO2
+				, A.PATIENT_PN, A.PATIENT_ADDRESS, A.PATIENT_ADDRESS_DETAIL
+				, A.PATIENT_TYPE, A.PATIENT_SIGNIFICANT
+				, A.PATIENT_REGNO1|| '-' || A.PATIENT_REGNO2 AS PATIENT_REGNO
+				, ( SELECT CODE_NAME FROM COMMON_CODE WHERE CODE = A.PATIENT_TYPE ) AS PATIENT_TYPE_NAME
+				,B.PRE_DIAGNOSIS_KEY
+				,B.PRE_DIAGNOSIS_EXPERIENCE
+				,B.PRE_DIAGNOSIS_DISEASE
+				,B.PRE_DIAGNOSIS_ALLERGY
+				,B.PRE_DIAGNOSIS_PREGNANCY
+				,B.PRE_DIAGNOSIS_CHOICE
+				,B.PRE_DIAGNOSIS_DATE
+		    
+			FROM PATIENT A LEFT OUTER JOIN PRE_DIAGNOSIS B ON (A.PATIENT_KEY = B.PATIENT_KEY)
+		ORDER BY PATIENT_KEY DESC
+	</select>
+	
+	<!-- 환자 상세 조회하는 셀렉트문 -->
+	<select id="selectPatient" resultMap="patientMap" parameterType="string">
+		SELECT 
+			A.PATIENT_KEY, A.PATIENT_NAME, A.PATIENT_AGE
+			, A.PATIENT_SEX, A.PATIENT_REGNO1, A.PATIENT_REGNO2
+			, A.PATIENT_PN, A.PATIENT_ADDRESS, A.PATIENT_ADDRESS_DETAIL
+			, A.PATIENT_TYPE
+			, A.PATIENT_SIGNIFICANT
+			,B.PRE_DIAGNOSIS_KEY
+			,B.PRE_DIAGNOSIS_EXPERIENCE
+			,B.PRE_DIAGNOSIS_DISEASE
+			,B.PRE_DIAGNOSIS_ALLERGY
+			,B.PRE_DIAGNOSIS_PREGNANCY
+			,B.PRE_DIAGNOSIS_CHOICE
+			,B.PRE_DIAGNOSIS_DATE
+            ,C.GUARDIAN_KEY, C.GUARDIAN_NAME, C.GUARDIAN_PN, C.GUARDIAN_RELATION
+		FROM 
+			  PATIENT A 
+              LEFT OUTER JOIN PRE_DIAGNOSIS B ON (A.PATIENT_KEY = B.PATIENT_KEY)
+              LEFT OUTER JOIN GUARDIAN C ON (A.PATIENT_KEY = C.PATIENT_KEY)
+		WHERE A.PATIENT_KEY = #{patientKey}
+	</select>
+	
+	<!-- 환자 신규 등록하는 인서트문 -->
+	<insert id="insertPatient" parameterType="kr.or.ddit.vo.PatientVO" useGeneratedKeys="true" keyProperty="patientKey"
+		keyColumn="PATIENT_KEY">
+		INSERT INTO patient (
+		    patient_key, patient_name, patient_age
+		    , patient_sex, patient_regno1, patient_regno2
+		    , patient_pn, patient_address, patient_address_detail
+		    , patient_type, patient_significant
+				) VALUES (
+		    'P' || LPAD(PATIENT_SEQ.NEXTVAL, 5, '0')
+		    , #{patientName, jdbcType=VARCHAR}
+		    , EXTRACT(YEAR FROM SYSDATE) - 
+		        CASE WHEN SUBSTR(#{patientRegno1}, 1, 1) IN ('0', '1')
+		             THEN TO_NUMBER(SUBSTR(#{patientRegno1}, 1, 2)) + 2000
+		             ELSE TO_NUMBER(SUBSTR(#{patientRegno1}, 1, 2)) + 1900
+		        END
+		    , CASE WHEN SUBSTR(#{patientRegno2}, 1, 1) IN ('1', '3')
+	               THEN 'M'
+	               WHEN SUBSTR(#{patientRegno2}, 1, 1) IN ('2', '4')
+	               THEN 'F'
+	           END
+		    , #{patientRegno1, jdbcType=NUMERIC}
+		    , #{patientRegno2, jdbcType=NUMERIC}
+		    , #{patientPn, jdbcType=VARCHAR}
+		    , #{patientAddress, jdbcType=VARCHAR}
+		    , #{patientAddressDetail, jdbcType=VARCHAR}
+		    , #{patientType, jdbcType=VARCHAR}
+		    , #{patientSignificant, jdbcType=VARCHAR}
+		) 
+	</insert>
+	
+		
+	<!-- 환자 수정하는 업데이트문 -->
+	<update id="updatePatient" parameterType="kr.or.ddit.vo.PatientVO">
+		UPDATE PATIENT SET
+		    PATIENT_NAME = #{patientName},
+		    PATIENT_PN = #{patientPn},
+		    PATIENT_ADDRESS = #{patientAddress},
+		    PATIENT_ADDRESS_DETAIL = #{patientAddressDetail},
+		    PATIENT_TYPE = #{patientType},
+		    PATIENT_SIGNIFICANT = #{patientSignificant}
+		WHERE PATIENT_KEY = #{patientKey}
+
+	</update>
+	
+	
+	<!-- 정민 진료실1,2,3 뽑는 쿼리!!!!!!!!!!!!!!!!!!!! -->
+	<select id="selectReceipMember" resultType="kr.or.ddit.vo.ReceiptionVO">
+		SELECT R.PATIENT_KEY, OFFICE_KEY, PATIENT.PATIENT_NAME, PATIENT.PATIENT_REGNO1 
+		FROM RECEIPT R
+		INNER JOIN PATIENT
+		ON (R.PATIENT_KEY=PATIENT.PATIENT_KEY)
+        LEFT OUTER JOIN WAITING_HISTORY WH ON (R.RECEIPT_KEY = WH.RECEIPT_KEY)
+		WHERE WAITING_LOCATION = 'L001' OR WAITING_LOCATION = 'L002' OR WAITING_LOCATION = 'L003'
+			
+	</select>
+	
+	
+	<select id="selectPatientDetail" parameterType="String" resultMap="patientMap">
+		SELECT 
+			P.PATIENT_KEY
+			, PATIENT_NAME
+			, PATIENT_AGE
+			, PATIENT_SEX
+			, PATIENT_REGNO1
+			, PATIENT_REGNO2
+			, PATIENT_REGNO1 || '-' || PATIENT_REGNO2 AS PATIENT_REGNO
+			, PATIENT_PN
+			, PATIENT_ADDRESS
+			, PATIENT_ADDRESS_DETAIL
+			, PATIENT_TYPE
+			, (SELECT CODE_NAME FROM COMMON_CODE WHERE CODE = PATIENT_TYPE) AS PATIENT_TYPE_NAME
+			, PATIENT_SIGNIFICANT
+			, PRE_DIAGNOSIS_KEY
+			, PRE_DIAGNOSIS_EXPERIENCE
+			, PRE_DIAGNOSIS_DISEASE
+			, PRE_DIAGNOSIS_ALLERGY
+			, PRE_DIAGNOSIS_PREGNANCY
+			, PRE_DIAGNOSIS_CHOICE
+			, PRE_DIAGNOSIS_DATE
+			, GUARDIAN_KEY
+			, GUARDIAN_NAME
+			, GUARDIAN_PN
+			, GUARDIAN_RELATION
+			, (SELECT CODE_NAME FROM COMMON_CODE WHERE CODE = GUARDIAN_RELATION) AS GUARDIAN_RELATION_NAME
+		FROM PATIENT P LEFT OUTER JOIN PRE_DIAGNOSIS PD ON (P.PATIENT_KEY = PD.PATIENT_KEY)
+		                LEFT OUTER JOIN GUARDIAN G ON (P.PATIENT_KEY = G.PATIENT_KEY)
+		WHERE P.PATIENT_KEY = #{patientKey}	
+	</select>
+	
+	<!-- 정민 - 수납대기환자 뽑기 (대기목록 띄워주는 쿼리(상태RS01, waiting history L008)) -->
+	<!-- 정민 - 수납대기환자 뽑기 -->
+	<select id="selectPayWaiting" resultMap="patientMap">
+		SELECT
+			A.PATIENT_KEY,
+		    PATIENT_NAME,
+		    A.PATIENT_REGNO1,
+		    B.RECEIPT_STATUS,
+		    PAY.PAY_CHECK,
+		    PAY.PAY_TOTAL_COST
+		FROM
+		    PATIENT A
+		    INNER JOIN RECEIPT B ON A.PATIENT_KEY = B.PATIENT_KEY
+		    LEFT OUTER JOIN PAY ON B.RECEIPT_KEY = PAY.RECEIPT_KEY
+		    LEFT OUTER JOIN WAITING_HISTORY C ON B.RECEIPT_KEY = C.RECEIPT_KEY 
+		WHERE
+		    B.RECEIPT_STATUS = 'RS01'
+		    AND C.WAITING_LOCATION = 'L008'
+	</select>
+	
+	<!-- 수납이 완료된 환자 목록 출력하는 쿼리 -->
+		<select id="completePayment" resultMap="payMap">
+		SELECT 
+		A.*
+		,PATIENT.*
+				FROM(
+				    SELECT 
+		            PAY_KEY
+				      , NVL(R.PATIENT_KEY, H.PATIENT_KEY) AS PATIENT_KEY
+				    FROM PAY P 
+				        LEFT OUTER JOIN RECEIPT R ON (P.RECEIPT_KEY = R.RECEIPT_KEY)
+				        LEFT OUTER JOIN HOSPITALIZE_RECORD H ON (P.HOSPITALIZE_RECORD_KEY = H.HOSPITALIZE_RECORD_KEY)
+				    WHERE PAY_CHECK = 1
+				    AND TO_CHAR(PAY_DATE, 'YYYY-MM-DD') = TO_CHAR(SYSDATE, 'YYYY-MM-DD')
+				    ORDER BY PAY_DATE DESC
+				)A LEFT OUTER JOIN PATIENT ON (A.PATIENT_KEY = PATIENT.PATIENT_KEY)
+	</select>
+	
+	
+	<!-- 진료차트 출력을 할 수 있는 환자목록 출력하기 -->
+	<select id="selectJinRyoChartList" resultMap="patientMap">
+		SELECT
+		MC.CHART_KEY,
+		P.PATIENT_KEY, PATIENT_NAME, PATIENT_AGE, PATIENT_SEX, PATIENT_REGNO1, PATIENT_PN,
+		R.RECEIPT_KEY, R.OFFICE_KEY, R.RECEIPT_DATE, R.RECEIPT_REASON, R.RECEIPT_STATUS
+		FROM
+		PATIENT P LEFT OUTER JOIN RECEIPT R ON (P.PATIENT_KEY = R.PATIENT_KEY)
+		LEFT OUTER JOIN MEDICAL_CHART MC ON (R.RECEIPT_KEY = MC.RECEIPT_KEY)
+		WHERE MC.CHART_KEY IS NOT NULL
+		ORDER BY MC.CHART_KEY DESC
+	</select>
+	
+	
+	
+	<!-- 정민 - POI 진료차트 출력을 위해 환자의 진료관련 내용을 뽑는 쿼리 -->
+	<select id="selectMedicalCertificate" resultMap="patientMap" parameterType="string">	
+		SELECT 
+		B.*
+		, (SELECT DISEASE_NM_KR FROM DISEASE WHERE DISEASE_KEY = D.DISEASE_KEY) AS DISEASE_NM_KR
+		    FROM(
+		        SELECT ROWNUM AS RN, A.*
+		        FROM(
+		            SELECT
+		            PATIENT_NAME
+		            , PATIENT_SEX
+		            , PATIENT_REGNO1
+		            , PATIENT_PN
+		            , PATIENT_ADDRESS || ' ' || PATIENT_ADDRESS_DETAIL as P_ADDRESS
+		            , CHART_KEY
+		            , CHART_CONT
+		            FROM PATIENT P LEFT OUTER JOIN MEDICAL_CHART MC ON (P.PATIENT_KEY = MC.PATIENT_KEY)
+		            WHERE P.PATIENT_KEY = #{patientKey}
+		            ORDER BY CHART_DATE DESC
+		        )A
+		    )B LEFT OUTER JOIN DIAGNOSIS D ON (B.CHART_KEY = D.CHART_KEY)
+		WHERE RN = 1
+	</select>
+	
+	<select id="selectPayWaitingList" resultMap="payMap">
+		SELECT *
+		FROM(
+		    SELECT 
+		        PAY_KEY
+		        , A.RECEIPT_KEY
+		        , PATIENT.*
+		        , NVL(WH1.WAITING_CHANGE_TIME, WH2.WAITING_CHANGE_TIME) AS WAITING_CHANGE_TIME
+		        , NVL(WH1.WAITING_LOCATION, WH2.WAITING_LOCATION) AS WAITING_LOCATION
+		    FROM(
+		                SELECT 
+		                    PAY_KEY
+		                    , P.RECEIPT_KEY
+		                    , P.HOSPITALIZE_RECORD_KEY
+		                    , NVL(R.PATIENT_KEY,H.PATIENT_KEY) AS PATIENT_KEY
+		                FROM PAY P 
+		                        LEFT OUTER JOIN RECEIPT R ON (P.RECEIPT_KEY = R.RECEIPT_KEY)
+		                        LEFT OUTER JOIN HOSPITALIZE_RECORD H ON (P.HOSPITALIZE_RECORD_KEY = H.HOSPITALIZE_RECORD_KEY)
+		                WHERE PAY_CHECK=0
+		        )A LEFT OUTER JOIN PATIENT ON (A.PATIENT_KEY = PATIENT.PATIENT_KEY)
+		            LEFT OUTER JOIN WAITING_HISTORY WH1 ON (WH1.RECEIPT_KEY = A.RECEIPT_KEY)
+		            LEFT OUTER JOIN WAITING_HISTORY WH2 ON (WH2.HOSPITALIZE_RECORD_KEY = A.HOSPITALIZE_RECORD_KEY)
+		            )B
+		WHERE WAITING_LOCATION = 'L008'
+		ORDER BY WAITING_CHANGE_TIME
+	</select>
+	
+	<!-- 통계를 위해서 월만 00 자리수로 출력하기 -->
+	<select id="selectStatisticsList" resultMap="patientMap">
+		SELECT P.PATIENT_KEY, PATIENT_NAME, PATIENT_AGE, PATIENT_SEX, 
+		       TO_CHAR(P2.PAY_DATE, 'MM') AS PAY_DATE,
+		       P2.PAY_TOTAL_COST
+		FROM PATIENT P
+		LEFT OUTER JOIN RECEIPT R ON P.PATIENT_KEY = R.PATIENT_KEY
+		LEFT OUTER JOIN PAY P2 ON R.RECEIPT_KEY = P2.RECEIPT_KEY
+		WHERE P2.PAY_CHECK = 1 AND R.RECEIPT_STATUS  = 'RS02'
+	</select>
+	
+	<resultMap type="kr.or.ddit.vo.PayVO" id="payCompleteMap" autoMapping="true">
+		<id property="payKey" column="PAY_KEY"/>
+		<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true"/>
+		<collection property="payDetailList" ofType="kr.or.ddit.vo.PayDetailVO" autoMapping="true"/>
+	</resultMap>
+	
+	<!-- 수납이 완료된 사람들 POI로 수납 내역울 출력하기 위한 쿼리  [정민]-->
+<!-- 	<select id="selectReceipt" resultMap="payCompleteMap" parameterType="int"> -->
+<!-- 		SELECT PT.PATIENT_KEY, PT.PATIENT_NAME, PT.PATIENT_REGNO1, P.PAY_KEY, P.RECEIPT_KEY, PAY_DATE, PAY_TOTAL_COST, -->
+<!-- 		PD.PAY_COST, PD.PAY_KIND -->
+<!--         , (SELECT PAY_PERCENTAGE FROM STANDARD_OF_PAY WHERE PD.PAY_KIND = STANDARD_OF_PAY.PAY_KIND) AS PAY_PERCENTAGE -->
+<!-- 		FROM PAY P LEFT OUTER JOIN PAY_DETAIL PD ON (P.PAY_KEY = PD.PAY_KEY) -->
+<!-- 		LEFT OUTER JOIN RECEIPT R ON (R.RECEIPT_KEY  = P.RECEIPT_KEY) -->
+<!-- 		LEFT OUTER JOIN PATIENT PT ON (R.PATIENT_KEY = PT.PATIENT_KEY) -->
+<!-- 		WHERE  P.PAY_KEY = 255 AND P.PAY_TOTAL_COST != 0 -->
+<!-- 	</select> -->
+
+	<select id="selectReceipt" resultMap="payCompleteMap" parameterType="int">
+		SELECT
+		    P.PAY_KEY
+		    , PAY_DETAIL_KEY
+		    , PAY_KIND
+		    , PAY_COST
+		    , PAY_PERCENTAGE
+		    , TRUNC(PAY_COST * ((100-PAY_PERCENTAGE)/100),-2) AS PAY_COST_PATIENT 
+		    , PATIENT_KEY
+		FROM PAY P 
+		        LEFT OUTER JOIN PAY_DETAIL PD ON(P.PAY_KEY = PD.PAY_KEY)
+		        LEFT OUTER JOIN RECEIPT R ON (R.RECEIPT_KEY  = P.RECEIPT_KEY)
+		WHERE P.PAY_KEY = #{payKey}
+	</select>
+	
+</mapper>

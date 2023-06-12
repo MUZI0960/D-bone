@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.medicalChart.dao.MedicalChartDAO">
+
+
+	<!-- 웨이팅리스트VO - 부모 테이블 - ReceiptionVO(진료차트 리스트) -->
+	<resultMap type="kr.or.ddit.vo.WaitingHistoryVO" id="waitingMap" autoMapping="true">
+		<id property="waitingKey" column="WAITING_KEY"/>
+		<association property="receipt" javaType="kr.or.ddit.vo.ReceiptionVO" autoMapping="true">
+			<id property="receiptKey" column="RECEIPT_KEY"/>
+			<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true">
+				<id property="patientKey" column="PATIENT_KEY"/>
+				<association property="preDiagnosis" javaType="kr.or.ddit.vo.PreDiagnosisVO" autoMapping="true"/>
+			</association>
+			<collection property="MChartList" ofType="kr.or.ddit.vo.MedicalChartVO" autoMapping="true">
+				<id property="chartKey" column="CHART_KEY"/>
+				<collection property="prescriptList" ofType="kr.or.ddit.vo.PrescriptionVO" autoMapping="true"/>
+				<collection property="orderHistoryList" ofType="kr.or.ddit.vo.OrderHistoryVO" autoMapping="true"/>
+			</collection>
+		</association>
+	</resultMap>
+	
+	<!-- 과거 진료차트 -->
+	<resultMap type="kr.or.ddit.vo.MedicalChartVO" id="preChartMap" autoMapping="true">
+		<id property="chartKey" column="CHART_KEY"/>
+		<association property="dianosis" javaType="kr.or.ddit.vo.DiagnosisVO" autoMapping="true">
+			<id property="diagnosisKey" column="DIAGNOSIS_KEY"/>
+			<association property="diease" javaType="kr.or.ddit.vo.DiseaseVO" autoMapping="true">
+				<id property="diseaseKey" column="DISEASE_KEY"/>
+				<collection property="diagonsisList" ofType="kr.or.ddit.vo.DiagnosisVO" autoMapping="true"/>
+			</association>
+		</association>
+		<collection property="prescriptList" ofType="kr.or.ddit.vo.PrescriptionVO" autoMapping="true"/>
+		<collection property="orderHistoryList" ofType="kr.or.ddit.vo.OrderHistoryVO" autoMapping="true">
+			<id property="orderKey" column="ORDER_KEY"/>
+			<association property="radiology" javaType="kr.or.ddit.vo.RadiologyVO" autoMapping="true">
+			</association>
+		</collection>
+	</resultMap>
+	
+	
+	<!-- 그룹오더 resultMap -->
+	<resultMap type="kr.or.ddit.vo.GroupOrderVO" id="groupOrderMap" autoMapping="true">
+		<id property="groupOrderKey" column="GROUP_ORDER_KEY"/>
+		<collection property="groupOrderPrescritionList" ofType="kr.or.ddit.vo.GroupOrderPrescritionVO" autoMapping="true">
+			<id property="goPrescriptkey" column="GO_PRESCRIPTKEY"/>
+			<association property="groupOrder" javaType="kr.or.ddit.vo.GroupOrderVO" autoMapping="true"/>
+		</collection>
+	</resultMap>
+	
+	<select id="selectWaitingList" parameterType="string" resultMap="waitingMap">
+	SELECT 
+		    W.WAITING_KEY
+		    , W.WAITING_CHANGE_TIME
+		    , C1.CODE_NAME AS WAITING_LOCATION_NAME
+		    , W.WAITING_LOCATION
+		    , W.WAITING_STATUS
+		    , C2.CODE_NAME AS WAITING_STATUS_NAME 
+		    , R.RECEIPT_KEY
+		    , R.PATIENT_KEY
+		    , R.OFFICE_KEY
+		    , C3.CODE_NAME AS OFFICE_KEY_NAME
+		    , R.RECEIPT_DATE
+		    , R.RECEIPT_REASON
+		    , R.RECEIPT_STATUS
+		    , C4.CODE_NAME AS RECEIPT_STATUS_NAME 
+		    
+		    , B.PATIENT_NAME, B.PATIENT_AGE, B.PATIENT_SEX
+		    , B.PATIENT_REGNO1, B.PATIENT_REGNO2, B.PATIENT_PN, B.PATIENT_ADDRESS
+		    , B.PATIENT_ADDRESS_DETAIL, B.PATIENT_TYPE, B.PATIENT_SIGNIFICANT
+		
+		    , E.EMP_KEY, E.EMP_ID, E.EMP_NAME, E.EMP_AGE, E.EMP_JOB, E.EMP_LICENSE_NO
+		    
+		    , P.PRE_DIAGNOSIS_KEY
+		    , P.PRE_DIAGNOSIS_EXPERIENCE
+		    , P.PRE_DIAGNOSIS_DISEASE
+		    , P.PRE_DIAGNOSIS_ALLERGY
+		    , P.PRE_DIAGNOSIS_PREGNANCY
+		    , P.PRE_DIAGNOSIS_CHOICE
+		    , P.PRE_DIAGNOSIS_DATE
+            
+            , M.CHART_KEY,  M.CHART_DATE, M.CHART_CONT
+            
+		FROM WAITING_HISTORY W LEFT OUTER JOIN RECEIPT R ON ( W.RECEIPT_KEY =  R.RECEIPT_KEY)
+		    INNER JOIN PATIENT B ON ( R.PATIENT_KEY = B.PATIENT_KEY) 
+             LEFT OUTER JOIN  MEDICAL_CHART M ON (  R.RECEIPT_KEY = M.RECEIPT_KEY)
+		    LEFT OUTER JOIN COMMON_CODE C1 ON ( C1.CODE = W.WAITING_LOCATION) 
+		    LEFT OUTER JOIN COMMON_CODE C2 ON ( C2.CODE = W.WAITING_STATUS) 
+		    LEFT OUTER JOIN COMMON_CODE C3 ON ( C3.CODE = R.OFFICE_KEY) 
+		    LEFT OUTER JOIN COMMON_CODE C4 ON ( C4.CODE = R.RECEIPT_STATUS)
+		    LEFT OUTER JOIN DOCTOR_OFFICE O ON (O.OFFICE_KEY = R.OFFICE_KEY)
+		    LEFT OUTER JOIN EMP E ON (O.EMP_KEY = E.EMP_KEY) 
+		    LEFT OUTER JOIN PRE_DIAGNOSIS P ON (P.PATIENT_KEY = B.PATIENT_KEY)
+		WHERE WAITING_LOCATION =#{officeKey}  AND W.WAITING_STATUS IN ('WS01', 'WS05') 
+			  AND W.WAITING_LOCATION =#{officeKey} 
+		ORDER BY WAITING_CHANGE_TIME ASC
+	</select>
+	
+	
+	
+	<select id="selectSurgeryKindList" resultType="kr.or.ddit.vo.SurgeryKindVO">
+		select * from SURGERY_KIND
+	</select>
+	<!-- 질병코드리스트 출력 -->
+	<select id="selectDiseaseAllList" resultType="kr.or.ddit.vo.DiseaseVO">
+		SELECT 
+			DISEASE_KEY
+			, DISEASE_NM_EN
+			, DISEASE_NM_KR
+		FROM DISEASE
+		ORDER BY DISEASE_KEY
+	</select>
+	
+	<!-- 환자 과거 차트 조회 -->
+	<select id="selectMedicalChartList" parameterType="string" resultMap="preChartMap">
+ 	SELECT 
+	       M.CHART_KEY, M.RECEIPT_KEY, M.PATIENT_KEY, M.EMP_KEY, M.CHART_DATE, M.CHART_CONT
+		    , E.EMP_NAME
+		    
+		    , ORD.ORDER_KEY, ORD.ORDER_KIND
+		    
+		    , ORD.BODY_PART_KEY, ORD.EQUIPMENT_KEY, EQ.EQUIPMENT_NAME 
+		    , DIA.DIAGNOSIS_KEY, DIA.DISEASE_KEY
+		    , DIS.DISEASE_NM_KR
+
+		    , PS.PRESCRIPTION_KEY, PS.PRESCRIPTION_NO, PS.PRESCRIPTION_DAY, PS.PRESCRIPTION_NAME
+		    , PS.PRESCRIPTION_TOTAL, PS.PRESCRIPTION_ROUTE, PS.PRESCRIPTION_EA, PS.PRESCRIPTION_COST
+            
+            
+            , RAD.RAD_RECODE, RAD.ATT_GROUP_NO, RAD.RAD_CONT, RAD.RAD_RECORD_DATE, RAD.RAD_EMP , RE.EMP_NAME as RAD_EMP_NAME
+		FROM MEDICAL_CHART M LEFT OUTER JOIN ORDER_HISTORY ORD ON (M.CHART_KEY = ORD.CHART_KEY)
+		     LEFT OUTER JOIN EMP E ON ( M.EMP_KEY = E.EMP_KEY)
+		     LEFT OUTER JOIN DIAGNOSIS DIA ON (M.CHART_KEY = DIA.CHART_KEY)
+		     LEFT OUTER JOIN DISEASE DIS ON (DIS.DISEASE_KEY = DIA.DISEASE_KEY )
+		     LEFT OUTER JOIN PRESCRIPTION PS ON (M.CHART_KEY = PS.CHART_KEY)
+		     LEFT OUTER JOIN MEDICLA_EQUIPMENT EQ ON (ORD.EQUIPMENT_KEY = EQ.EQUIPMENT_KEY)
+             LEFT OUTER JOIN RADIOLOGY RAD ON (RAD.ORDER_KEY = ORD.ORDER_KEY)
+             LEFT OUTER JOIN EMP RE ON (RAD.RAD_EMP = RE.EMP_KEY)
+             
+        WHERE PATIENT_KEY = #{patientKey}
+        ORDER BY CHART_DATE DESC
+	</select>
+	
+	<!-- 물리치료실 장비 불러오기 -->
+	<select id="selectMedicalEquipmentList" resultType="kr.or.ddit.vo.MedicalEquipmentVO">
+		SELECT
+		    EQUIPMENT_KEY
+		    , EQUIPMENT_NAME
+		    , BUYER_KEY
+		    , EQUIPMENT_LOCATION
+		    , EQUIPMENT_MODEL
+		    , EQUIPMENT_STATUS
+		    FROM MEDICLA_EQUIPMENT
+		WHERE EQUIPMENT_STATUS ='US01' AND EQUIPMENT_LOCATION ='L004'
+	</select>
+	
+	<!-- 신체부위 목록 불러오기 -->
+	<select id="selectBodyPartList" resultType="kr.or.ddit.vo.CommonCodeVO">
+		SELECT 
+			CODE, CODE_NAME
+			FROM COMMON_CODE
+		WHERE CODE BETWEEN 'B001' AND 'B013'
+	</select>
+	
+	<select id="createChartNo" resultType="string">
+	  SELECT 'C'|| LPAD(MAX(TO_NUMBER(SUBSTR(CHART_KEY,2,6)))+1,5,'0') CHART_KEY 
+				FROM MEDICAL_CHART
+	</select>
+		
+	<!-- 오더 내역 등록 -->
+	<insert id="insertOrderHistory" parameterType="kr.or.ddit.vo.OrderHistoryVO">
+		<selectKey resultType="java.lang.String" keyProperty="orderKey" order="BEFORE">
+			SELECT 'O'|| LPAD(ORDER_SEQ.NEXTVAL, 5, '0') FROM DUAL
+		</selectKey>
+		INSERT INTO ORDER_HISTORY(
+		    ORDER_KEY
+		    , CHART_KEY
+		    , ORDER_KIND
+		    , BODY_PART_KEY
+		    , EQUIPMENT_KEY
+		) VALUES(
+		    #{orderKey, jdbcType=VARCHAR}
+		    ,#{chartKey, jdbcType=VARCHAR}
+		    ,#{orderKind, jdbcType=VARCHAR}
+		    ,#{bodyPartKey, jdbcType=VARCHAR}
+		    ,#{equipmentKey, jdbcType=NUMERIC}
+		)
+	</insert>
+	
+	<insert id="insertPrescription" parameterType="kr.or.ddit.vo.PrescriptionVO">
+		<selectKey resultType="java.lang.String" keyProperty="prescriptionKey" order="BEFORE"> 
+			SELECT 'PS'|| LPAD(PRESCRIPTION_SEQ.NEXTVAL, 4, '0') FROM DUAL
+		</selectKey>
+		INSERT INTO PRESCRIPTION(
+		    PRESCRIPTION_KEY
+		    , CHART_KEY
+		    , PRESCRIPTION_NO
+		    , PRESCRIPTION_DAY
+		    , PRESCRIPTION_TOTAL
+		    , PRESCRIPTION_ROUTE
+		    , PRESCRIPTION_EA
+		    , PRESCRIPTION_COST
+		    , PRESCRIPTION_NAME
+		)VALUES(
+			#{prescriptionKey, jdbcType=VARCHAR}
+			,#{chartKey, jdbcType=VARCHAR}
+			,#{prescriptionNo, jdbcType=NUMERIC}
+			,#{prescriptionDay, jdbcType=NUMERIC}
+			,#{prescriptionTotal, jdbcType=NUMERIC}
+			,#{prescriptionRoute, jdbcType=VARCHAR}
+			,#{prescriptionEa, jdbcType=VARCHAR}
+			,#{prescriptionCost, jdbcType=NUMERIC}
+			,#{prescriptionName, jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<insert id="insertDiagnosis" parameterType="kr.or.ddit.vo.DiagnosisVO">
+		<selectKey resultType="string" keyProperty="diagnosisKey" order="BEFORE">
+			SELECT 'D'|| LPAD(DIAGNOSIS_SEQ.NEXTVAL, 5, '0') FROM DUAL
+		</selectKey>
+		INSERT INTO DIAGNOSIS(
+		    DIAGNOSIS_KEY
+		    , CHART_KEY
+		    , DISEASE_KEY
+		) VALUES(
+		    #{diagnosisKey, jdbcType=VARCHAR}
+			,#{chartKey, jdbcType=VARCHAR}
+			,#{diseaseKey, jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<insert id="insertMChart" parameterType="kr.or.ddit.vo.MedicalChartVO">
+		<selectKey resultType="java.lang.String" keyProperty="chartKey" order="BEFORE">
+		  SELECT 'C'|| LPAD(MAX(TO_NUMBER(SUBSTR(CHART_KEY,2,6)))+1,5,'0') CHART_KEY 
+				FROM MEDICAL_CHART
+		</selectKey>
+		INSERT INTO MEDICAL_CHART(
+		    CHART_KEY
+		    , RECEIPT_KEY
+		    , PATIENT_KEY
+		    , EMP_KEY
+		    , CHART_DATE
+		    , CHART_CONT
+		) VALUES (
+	        #{chartKey, jdbcType=VARCHAR}
+		    ,#{receiptKey, jdbcType=VARCHAR}
+		    ,#{patientKey, jdbcType=VARCHAR}
+		    ,#{empKey, jdbcType=VARCHAR}
+		    , SYSDATE
+		    ,#{chartCont, jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	
+	
+	<update id="updateWaitingStatus" parameterType="kr.or.ddit.vo.WaitingHistoryVO">
+		UPDATE WAITING_HISTORY SET
+				WAITING_CHANGE_TIME = SYSDATE
+				, WAITING_LOCATION = #{waitingLocation, jdbcType=VARCHAR}
+			 	, WAITING_STATUS= 'WS01'
+		WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR}
+	</update>
+	
+	<select id="selectReceipKey" parameterType="string" resultType="string">
+		SELECT RECEIPT_KEY FROM MEDICAL_CHART WHERE CHART_KEY = #{chartKey}
+	</select>
+	
+	<!-- 해당 차트의 엑스레이 오더가 있다면 -->
+	<select id="selectCountXrayOrder" parameterType="string" resultType="int">
+		SELECT COUNT(ORDER_KIND) FROM ORDER_HISTORY
+		WHERE CHART_KEY = #{chartKey} AND ORDER_KIND = 'O003'
+	</select>
+	
+	<select id="selectCountMRIOrder">
+		SELECT COUNT(ORDER_KIND) FROM ORDER_HISTORY
+		WHERE CHART_KEY = #{chartKey} AND ORDER_KIND = 'O004'
+	</select>
+	
+	<!-- 수술 오더시 입원 등록 -->
+	<insert id="insertWaitingHospitalzation" parameterType="string">
+		INSERT INTO WAITING_HOSPITALIZATION (
+		    WAITING_KEY
+		    , PATIENT_KEY
+		    , WARD_GRADE
+		    , WH_STATUS
+		)
+		VALUES (
+		    'WH' || LPAD(WAITING_HOSPITALIZATION_SEQ.NEXTVAL, 5, '0')
+		    , (SELECT PATIENT_KEY FROM MEDICAL_CHART WHERE CHART_KEY = #{patientKey})
+		    , NULL
+		    , 0
+		)
+	</insert>
+	
+	<update id="updateOrderHistory" parameterType="kr.or.ddit.vo.OrderHistoryVO">
+		UPDATE ORDER_HISTORY SET
+		    ORDER_KIND=#{orderKind, jdbcType=VARCHAR}
+		    ,BODY_PART_KEY=#{bodyPartKey, jdbcType=VARCHAR}
+		    ,EQUIPMENT_KEY=#{equipmentKey, jdbcType=NUMERIC}
+		WHERE ORDER_KEY=#{orderKey, jdbcType=VARCHAR}
+	</update>
+	
+	<insert id="insertGroupOrder" parameterType="kr.or.ddit.vo.GroupOrderVO">
+		<selectKey order="BEFORE" resultType="int" keyProperty="groupOrderKey">
+			SELECT GROUP_ORDER_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO GROUP_ORDER(
+		    GROUP_ORDER_KEY
+		    , GROUP_ORDER_NAME
+		    , EMP_KEY
+		    , GROUP_ORDER_CONTENT
+		    , DISEASE_KEY
+		)VALUES (
+		    #{groupOrderKey, jdbcType=NUMERIC}
+		    ,#{groupOrderName, jdbcType=VARCHAR}
+		    ,#{empKey, jdbcType=VARCHAR}
+		    ,#{groupOrderContent, jdbcType=VARCHAR}
+		    ,#{diseaseKey, jdbcType=VARCHAR}
+		)
+	</insert>
+	<insert id="insertGroupOrderPrescript" parameterType="kr.or.ddit.vo.GroupOrderPrescritionVO">
+		<selectKey order="BEFORE" resultType="string" keyProperty="goPrescriptkey">
+			SELECT 'GP'||LPAD(GO_PRESCRIPT_SEQ.NEXTVAL, 5, '0') FROM DUAL
+		</selectKey>
+		INSERT INTO GROUP_ORDER_PRESCRIPTION(
+		    GO_PRESCRIPTKEY
+		    , GROUP_ORDER_KEY
+		    , GO_PRESCRIPTION_NO
+		)VALUES(
+		    #{goPrescriptkey, jdbcType=VARCHAR}
+		    ,#{groupOrderKey, jdbcType=NUMERIC}
+		    ,#{goPrescriptionNo, jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<select id="getGroupOrderList" resultMap="groupOrderMap" parameterType="string">
+		SELECT 
+			A.GROUP_ORDER_KEY
+			, A.GROUP_ORDER_NAME
+			, A.EMP_KEY
+			, A.GROUP_ORDER_CONTENT
+			, A.DISEASE_KEY
+			
+			, B.GO_PRESCRIPTKEY
+			, B.GROUP_ORDER_KEY
+			, B.GO_PRESCRIPTION_NO
+			FROM GROUP_ORDER A INNER JOIN GROUP_ORDER_PRESCRIPTION B ON (A.GROUP_ORDER_KEY = B.GROUP_ORDER_KEY)
+			WHERE EMP_KEY = #{empKey}
+			ORDER BY 1 ASC
+	</select>
+	
+	<update id="updateGroupOrder" parameterType="kr.or.ddit.vo.GroupOrderVO">
+		UPDATE GROUP_ORDER SET
+		    GROUP_ORDER_NAME=#{groupOrderName, jdbcType=VARCHAR}
+		    ,EMP_KEY=#{empKey, jdbcType=VARCHAR}
+		    ,GROUP_ORDER_CONTENT=#{groupOrderContent, jdbcType=VARCHAR}
+		    ,DISEASE_KEY=#{diseaseKey, jdbcType=VARCHAR}
+		WHERE GROUP_ORDER_KEY=#{groupOrderKey, jdbcType=NUMERIC}
+	</update>
+	
+	<update id="updateGroupOrderPrescript" parameterType="kr.or.ddit.vo.GroupOrderPrescritionVO"> 
+		UPDATE GROUP_ORDER_PRESCRIPTION SET
+		    GO_PRESCRIPTION_NO=#{goPrescriptionNo, jdbcType=VARCHAR}
+		WHERE GO_PRESCRIPTKEY=#{goPrescriptkey, jdbcType=VARCHAR} 
+		    AND GROUP_ORDER_KEY=#{groupOrderKey, jdbcType=NUMERIC}
+	</update>
+	
+	<delete id="deleteGroupOrderPrescript" parameterType="string">
+		DELETE FROM GROUP_ORDER_PRESCRIPTION
+		WHERE GO_PRESCRIPTKEY = #{goPrescriptkey}
+	</delete>
+	
+	<delete id="deleteGroupOrder" parameterType="int">
+		DELETE FROM GROUP_ORDER WHERE GROUP_ORDER_KEY = #{groupOrderKey}
+	</delete>
+	
+	<delete id="deleteGroupOrderPrescriptTotal" parameterType="int">
+		DELETE FROM GROUP_ORDER_PRESCRIPTION WHERE GROUP_ORDER_KEY = #{groupOrderKey}
+	</delete>
+	
+	
+	<!-- 진료차트 재진료시 수정 -->
+	<update id="updateDiagnosis" parameterType="kr.or.ddit.vo.DiagnosisVO">
+		UPDATE DIAGNOSIS SET
+		    DISEASE_KEY=#{diseaseKey, jdbcType=VARCHAR}
+		WHERE CHART_KEY=#{chartKey, jdbcType=VARCHAR}
+	</update>
+	
+	<update id="updatePrescription" parameterType="kr.or.ddit.vo.PrescriptionVO">
+		UPDATE PRESCRIPTION SET
+		    PRESCRIPTION_NO=#{prescriptionNo, jdbcType=NUMERIC}
+		    ,PRESCRIPTION_DAY=#{prescriptionDay, jdbcType=NUMERIC}
+		    ,PRESCRIPTION_TOTAL=#{prescriptionTotal, jdbcType=NUMERIC}
+		    ,PRESCRIPTION_ROUTE=#{prescriptionRoute, jdbcType=VARCHAR}
+		    ,PRESCRIPTION_EA=#{prescriptionEa, jdbcType=VARCHAR}
+		WHERE PRESCRIPTION_KEY=#{prescriptionKey, jdbcType=VARCHAR} 
+	</update>
+	
+	<delete id="deletePrescription" parameterType="string">
+		DELETE FROM PRESCRIPTION
+		WHERE  PRESCRIPTION_KEY=#{prescriptionKey, jdbcType=VARCHAR}
+	</delete>
+	
+	<select id="selectReceiptstatus" parameterType="string" resultType="string">
+		SELECT RECEIPT_STATUS FROM RECEIPT WHERE RECEIPT_KEY =  #{receiptKey}
+	</select>
+	
+	<!-- 처방내역 번호로 처방내역 찾기 -->
+	<select id="selectprescrition" parameterType="string">
+		SELECT 
+			PRESCRIPTION_KEY
+			, CHART_KEY
+			, PRESCRIPTION_NO
+			, PRESCRIPTION_DAY
+			, PRESCRIPTION_TOTAL
+			, PRESCRIPTION_ROUTE
+			, PRESCRIPTION_EA
+			, PRESCRIPTION_COST
+			, PRESCRIPTION_NAME
+			FROM PRESCRIPTION
+		WHERE PRESCRIPTION_KEY = #{prescriptionKey}
+	</select>
+	
+	<select id="selectDiagnosis" parameterType="string">
+		SELECT DIAGNOSIS_KEY, CHART_KEY, DISEASE_KEY
+		FROM DIAGNOSIS
+		WHERE CHART_KEY = #{chartKey}
+	</select>
+	
+	<update id="updateMChart" parameterType="kr.or.ddit.vo.MedicineVO">
+		UPDATE MEDICAL_CHART SET
+		     CHART_DATE= SYSDATE
+		    ,CHART_CONT=#{chartCont, jdbcType=VARCHAR}
+		WHERE CHART_KEY=#{chartKey, jdbcType=VARCHAR}
+	</update>
+</mapper>

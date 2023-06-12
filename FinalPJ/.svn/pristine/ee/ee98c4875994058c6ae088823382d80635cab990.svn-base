@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 약품관리 페이지에서 약품 주문 요청하는 xml -->
+
+<mapper namespace="kr.or.ddit.product.dao.ProductOrderRecordDAO">
+
+	<select id="porList">
+		SELECT ORDER_NO, MEDICINE_KEY, ORDER_QUANTITY,
+		ORDER_COST, ORDER_CHARGER,
+		ORDER_DATE, ORDER_REQUEST_NO
+		, (SELECT MEDICINE_NAME FROM MEDICINE M WHERE M.MEDICINE_KEY = PRODUCT_ORDER_RECORD.MEDICINE_KEY) AS MEDICINE_NAME
+		FROM PRODUCT_ORDER_RECORD 
+	</select>
+	
+	
+	<select id="getOrderRequestNo" resultType="string">
+		SELECT 'PD' ||
+		LPAD(PRODUCT_ORDER_SEQ.NEXTVAL, 5, '0') FROM DUAL
+	</select>
+	
+	<insert id="insertPor"
+		parameterType="kr.or.ddit.vo.ProductOrderRecordVO">
+		INSERT INTO PRODUCT_ORDER_RECORD
+		(ORDER_NO, MEDICINE_KEY,
+		ORDER_QUANTITY, ORDER_COST, ORDER_CHARGER, ORDER_DATE,
+		ORDER_REQUEST_NO)
+		VALUES('P' || LPAD(PRODUCT_ORDER_SEQ.NEXTVAL, 5, '0')
+		, #{medicineKey}
+		, #{orderQuantity}
+		, #{orderCost}
+		, #{orderCharger}
+		, SYSDATE
+		, #{orderRequestNo})
+
+	</insert>
+
+	<!-- <foreach collection="list" item="item" index="index" -->
+	<!-- separator=" " open="INSERT ALL" close="SELECT * FROM DUAL"> -->
+	<!-- </foreach> -->
+</mapper>

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.attach.dao.AttachFileGroupDAO">
+
+<!-- insert 파일 -->
+	<insert id="insertAttachFileGroup">
+		<selectKey order="BEFORE" resultType="int" keyProperty="attGroupNo">
+		SELECT ATT_SEQ.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT ALL
+		<foreach collection="attFileList" item="attach" index="idx">
+		 INTO ATTACH(
+			ATT_GROUP_NO
+			, ATT_NO
+			, ATT_TYPE
+			, ORIGN_NAME
+			, SAVE_NAME
+			, ATT_SIZE
+			, ATT_DATE
+			, ATT_PATH
+		)VALUES(
+			#{attGroupNo, jdbcType=NUMERIC}
+			, #{idx}+1
+			, #{attach.attType, jdbcType=VARCHAR}
+			, #{attach.orignName, jdbcType=VARCHAR}
+			, #{attach.saveName, jdbcType=VARCHAR}
+			, #{attach.attSize, jdbcType=VARCHAR}
+			, SYSDATE
+			, #{attach.attPath, jdbcType=VARCHAR}
+		)
+		</foreach>
+		SELECT * FROM DUAL
+	</insert>
+	
+	<resultMap type="kr.or.ddit.vo.AttatchFileGroupVO" id="attachMap">
+		<id property="attGroupNo" column="ATT_GROUP_NO"/>
+		<collection property="attFileList" ofType="kr.or.ddit.vo.AttachVO" autoMapping="true"/>
+	</resultMap>
+	
+	<select id="selectFileList" parameterType="int" resultMap="attachMap">
+		SELECT 
+		    ATT_GROUP_NO
+		    , ATT_NO
+		    , ATT_TYPE
+		    , ORIGN_NAME
+		    , SAVE_NAME
+		    , ATT_SIZE
+		    , ATT_DATE
+		    , ATT_PATH
+		FROM ATTACH
+		WHERE ATT_GROUP_NO = #{attGroupNo}
+	</select>
+	
+	<update id="updateAttachFileGroupForEmpProfil" parameterType="kr.or.ddit.vo.AttachVO">
+		UPDATE ATTACH SET 
+		    ATT_TYPE=#{attType, jdbcType=VARCHAR}
+		    ,ORIGN_NAME=#{orignName, jdbcType=VARCHAR}
+		    ,SAVE_NAME=#{saveName, jdbcType=VARCHAR}
+		    ,ATT_SIZE=#{attSize, jdbcType=VARCHAR}
+		    ,ATT_DATE= sysdate
+		    ,ATT_PATH=#{attPath, jdbcType=VARCHAR}
+		WHERE ATT_GROUP_NO=#{attGroupNo, jdbcType=NUMERIC}
+	</update>
+	
+	<select id="selectAttachFile"  parameterType="int">
+		SELECT 
+			ATT_GROUP_NO
+			, ATT_NO, ATT_TYPE
+			, ORIGN_NAME
+			, SAVE_NAME
+			, ATT_SIZE
+			, ATT_DATE
+			, ATT_PATH
+		FROM ATTACH
+		WHERE ATT_GROUP_NO = #{attGroupNo}
+	</select>
+	
+	<delete id="deleteAttachFile" parameterType="int">
+		DELETE FROM ATTACH WHERE ATT_GROUP_NO = #{attGroupNo}
+	</delete>
+</mapper>

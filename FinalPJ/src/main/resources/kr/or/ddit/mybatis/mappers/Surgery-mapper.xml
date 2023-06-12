@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.surgery.dao.SurgeryDAO">
+	
+	<select id="selectPreExaminationList" resultType="kr.or.ddit.vo.PatientVO">
+		SELECT P.*, HOSPITALIZE_RECORD_KEY
+		FROM HOSPITALIZE_RECORD HR LEFT OUTER JOIN PATIENT P ON (HR.PATIENT_KEY = P.PATIENT_KEY)
+		WHERE STATUS IS NULL
+		ORDER BY HOSPITALIZE_RECORD_KEY
+	</select>
+	
+	<select id="selectMedicalChart" parameterType="String" resultType="kr.or.ddit.vo.MedicalChartVO">
+		SELECT 
+		    MC.CHART_KEY
+		    , PATIENT_KEY
+		    , (SELECT PATIENT_NAME FROM PATIENT WHERE PATIENT.PATIENT_KEY = MC.PATIENT_KEY) AS PATIENT_NAME
+		    , (SELECT DISEASE_NM_KR FROM DISEASE WHERE DISEASE.DISEASE_KEY = D.DISEASE_KEY) AS DISEASE_NAME
+		    , (SELECT SURGERY_KIND_NAME FROM SURGERY_KIND WHERE SURGERY_KIND_KEY = ORDER_KIND) AS ORDER_NAME
+		    , (SELECT EMP_NAME FROM EMP WHERE EMP.EMP_KEY = MC.EMP_KEY) AS EMP_NAME
+		    , MC.CHART_CONT
+		FROM( 
+		    SELECT CHART_KEY, ORDER_KIND
+		    FROM HOSPITALIZE_RECORD HR 
+		            LEFT OUTER JOIN ORDER_HISTORY OH ON(HR.ORDER_KEY = OH.ORDER_KEY)
+		    WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+		
+		)A LEFT OUTER JOIN MEDICAL_CHART MC ON (A.CHART_KEY = MC.CHART_KEY)
+		    LEFT OUTER JOIN DIAGNOSIS D ON (A.CHART_KEY = D.CHART_KEY)
+	</select>
+	
+	<select id="selectPreExaminationKey" resultType="String">
+		SELECT 'EX' || LPAD(PRE_EXAMINATION_SEQ.NEXTVAL,5,'0')
+		FROM DUAL
+	</select>
+	
+	<insert id="insertPreExamination" parameterType="kr.or.ddit.vo.PreExaminationVO">
+		INSERT INTO PRE_EXAMINATION(
+		    PRE_EXAMINATION_KEY
+		    , HOSPITALIZE_RECORD_KEY
+		    , BLOOD_TEST
+		    , ECG
+		    , URINALYSIS
+		    , PULMONARY_TEST
+		    , PRE_EXAMINATION_NOTE
+		    , PRE_EXAMINATION_DATE
+		) VALUES(
+		    #{preExaminationKey}
+		    , #{hospitalizeRecordKey}
+		    , #{bloodTest}
+		    , #{ecg}
+		    , #{urinalysis}
+		    , #{pulmonaryTest}
+		    , #{preExaminationNote}
+		    , SYSDATE
+		)
+	</insert>
+	
+	<update id="updateHospitalizeRecord" parameterType="String">
+		UPDATE HOSPITALIZE_RECORD
+		SET
+		    STATUS = #{status}
+		WHERE 
+		    HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+	</update>
+	
+	<insert id="insertPayDetailExamination" parameterType="String">
+		INSERT INTO PAY_DETAIL(
+		    PAY_DETAIL_KEY
+		    , PAY_KEY
+		    , PAY_KIND
+		    , PAY_COST
+		    , PAY_PERCENTAGE
+		)
+		SELECT 
+		    'PAY' || LPAD(PAY_DIETAIL_SEQ.NEXTVAL,3,'0')
+		    , PAY_KEY
+		    , 'PK06'
+		    , 10000
+		    ,0
+		FROM PAY
+		WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey} 
+	</insert>
+	
+	<select id="selectPreExaminationCompleteList" resultType="kr.or.ddit.vo.PatientVO">
+		SELECT 
+		    PATIENT_KEY
+		    , (SELECT PATIENT_NAME FROM PATIENT WHERE PATIENT.PATIENT_KEY = HR.PATIENT_KEY) AS PATIENT_NAME
+		    , STATUS
+		    , PRE_EXAMINATION_NOTE
+		FROM PRE_EXAMINATION PE 
+		        LEFT OUTER JOIN HOSPITALIZE_RECORD HR ON (PE.HOSPITALIZE_RECORD_KEY = HR.HOSPITALIZE_RECORD_KEY)
+		WHERE STATUS IS NOT NULL
+		ORDER BY PRE_EXAMINATION_DATE DESC
+	</select>
+	
+	<select id="selectWaitingSurgeryList" resultType="kr.or.ddit.vo.PatientVO">
+		SELECT 
+		    A.*
+		    , (SELECT SURGERY_KIND_NAME FROM SURGERY_KIND WHERE SURGERY_KIND_KEY = ORDER_KIND) AS SURGERY_NAME
+		FROM(     
+		    SELECT 
+		        P.PATIENT_KEY
+		        , P.PATIENT_NAME
+		        , HR.HOSPITALIZE_RECORD_KEY
+		        , (SELECT EMP_NAME FROM EMP WHERE EMP.EMP_KEY = HR.HOSPITALIZE_DOCTOR_KEY) AS EMP_NAME
+		        , (SELECT ORDER_KIND FROM ORDER_HISTORY OH WHERE OH.ORDER_KEY = HR.ORDER_KEY) AS ORDER_KIND
+		    FROM HOSPITALIZE_RECORD HR
+		            LEFT OUTER JOIN PRE_EXAMINATION PE ON (HR.HOSPITALIZE_RECORD_KEY = PE.HOSPITALIZE_RECORD_KEY)
+		            LEFT OUTER JOIN SURGERY_INFO SI ON (HR.HOSPITALIZE_RECORD_KEY = SI.HOSPITALIZE_RECORD_KEY)
+		            LEFT OUTER JOIN PATIENT P ON (HR.PATIENT_KEY = P.PATIENT_KEY)
+		    WHERE HR.CHECK_OUT_DATE IS NULL
+		        AND HR.STATUS LIKE '1'
+		        AND SI.SURGERY_INFO_KEY IS NULL
+		)A
+	</select>
+	
+	<select id="selectSurgeryInfoList" resultType="kr.or.ddit.vo.SurgeryInfoVO">
+		SELECT 
+			SURGERY_INFO_KEY
+			, SI.HOSPITALIZE_RECORD_KEY
+		    , SURGERY_START_DATE
+		    , SURGERY_END_DATE
+		    , (SELECT PATIENT_NAME FROM PATIENT WHERE PATIENT.PATIENT_KEY = HR.PATIENT_KEY) AS PATIENT_NAME
+		FROM SURGERY_INFO SI
+		        LEFT OUTER JOIN HOSPITALIZE_RECORD HR ON (SI.HOSPITALIZE_RECORD_KEY = HR.HOSPITALIZE_RECORD_KEY)
+	</select>
+	
+	<update id="updateSurgeryInfo" parameterType="kr.or.ddit.vo.SurgeryInfoVO">
+	    UPDATE SURGERY_INFO
+		SET
+		    SURGERY_START_DATE = #{surgeryStartDate}
+		    , SURGERY_END_DATE = #{surgeryEndDate}
+		WHERE 
+		    SURGERY_INFO_KEY = #{surgeryInfoKey}
+	</update>
+	
+	<insert id="insertSurgeryInfo" parameterType="kr.or.ddit.vo.SurgeryInfoVO">
+		INSERT INTO SURGERY_INFO (
+		    SURGERY_INFO_KEY
+		    , SURGERY_START_DATE
+		    , HOSPITALIZE_RECORD_KEY
+		    , SURGERY_END_DATE
+		    , SURGERY_MANAGER
+		) VALUES(
+		    SURGERY_INFO_SEQ.NEXTVAL
+		    , #{surgeryStartDate}
+		    , #{hospitalizeRecordKey}
+		    , #{surgeryEndDate}
+		    , #{surgeryManager}
+		)
+	</insert>
+	
+	<select id="selectSurgeryInfo" parameterType="String" resultType="kr.or.ddit.vo.SurgeryInfoVO">
+		SELECT 
+		    P.PATIENT_KEY
+		    , P.PATIENT_NAME
+		    , (SELECT EMP_NAME FROM EMP E WHERE E.EMP_KEY = HR.HOSPITALIZE_DOCTOR_KEY) AS EMP_NAME
+		    , (SELECT SURGERY_KIND_NAME FROM SURGERY_KIND SK WHERE SK.SURGERY_KIND_KEY = OH.ORDER_KIND) AS SURGERY_KIND_NAME
+		    , (SELECT EMP_NAME FROM EMP WHERE EMP.EMP_KEY = SI.SURGERY_MANAGER) AS SURGERY_MANAGER_NAME
+		FROM HOSPITALIZE_RECORD HR 
+		    LEFT OUTER JOIN SURGERY_INFO SI ON (HR.HOSPITALIZE_RECORD_KEY = SI.HOSPITALIZE_RECORD_KEY) 
+		    LEFT OUTER JOIN PATIENT P ON (HR.PATIENT_KEY = P.PATIENT_KEY)
+		    LEFT OUTER JOIN ORDER_HISTORY OH ON (HR.ORDER_KEY = OH.ORDER_KEY)
+		WHERE SURGERY_INFO_KEY = #{surgeryInfoKey}	
+	</select>
+	
+	<select id="selectSurgeryWaitingList" resultType="kr.or.ddit.vo.PatientVO">
+	
+	</select>
+</mapper>

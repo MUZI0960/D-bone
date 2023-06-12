@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.pay.dao.PayDAO">
+
+<!-- insert 진료비 수납 상세내역  -->
+<insert id="insertPayDetailForDiagnosis" parameterType="kr.or.ddit.vo.PayDetailVO">
+	<selectKey order="BEFORE" keyProperty="payDetailKey" resultType="string">
+		SELECT 'PAY'|| LPAD(PAY_DIETAIL_SEQ.NEXTVAL, 3, '0') FROM DUAL
+	</selectKey>
+	INSERT INTO PAY_DETAIL(
+	   PAY_DETAIL_KEY
+	   , PAY_KEY
+	   , PAY_KIND
+	   , PAY_COST
+	   , PAY_PERCENTAGE
+	) VALUES (
+	    #{payDetailKey, jdbcType=VARCHAR}
+	    ,(SELECT PAY_KEY FROM PAY WHERE RECEIPT_KEY = (SELECT RECEIPT_KEY FROM MEDICAL_CHART
+	        WHERE CHART_KEY = #{chartKey, jdbcType=VARCHAR}))
+	    ,#{payKind, jdbcType=VARCHAR}
+	    ,(SELECT PAY_COST FROM STANDARD_OF_PAY
+	        WHERE PAY_KIND = #{payKind, jdbcType=VARCHAR})
+        ,(SELECT PAY_PERCENTAGE FROM STANDARD_OF_PAY
+			WHERE PAY_KIND = #{payKind, jdbcType=VARCHAR})
+	)
+</insert>
+	<!-- 처방 내역 추가 -->
+	<insert id="insertPayDetailForPrescription" parameterType="kr.or.ddit.vo.PayDetailVO">
+		<selectKey order="BEFORE" resultType="string" keyProperty="payDetailKey">
+			SELECT 'PAY'|| LPAD(PAY_DIETAIL_SEQ.NEXTVAL, 3, '0') FROM DUAL
+		</selectKey>
+		INSERT INTO PAY_DETAIL(
+			   PAY_DETAIL_KEY
+			   , PAY_KEY
+			   , PAY_KIND
+			   , PAY_COST
+			   , PAY_PERCENTAGE
+			) VALUES (
+			    #{payDetailKey, jdbcType=VARCHAR}
+			    ,(SELECT PAY_KEY FROM PAY WHERE RECEIPT_KEY = (SELECT RECEIPT_KEY FROM MEDICAL_CHART
+			        WHERE CHART_KEY = #{chartKey, jdbcType=VARCHAR}))
+			    ,#{payKind, jdbcType=VARCHAR}
+			    ,#{prescritionCost, jdbcType=NUMERIC }
+		        ,(SELECT PAY_PERCENTAGE FROM STANDARD_OF_PAY
+					WHERE PAY_KIND = #{payKind, jdbcType=VARCHAR})
+			)
+	</insert>
+	
+	<select id="selectPayDetailPrescrition" parameterType="string" resultType="kr.or.ddit.vo.PayDetailVO">
+		SELECT 
+				PAY_DETAIL_KEY
+				, PAY_KEY
+				, PAY_KIND
+				, PAY_COST
+				, PAY_PERCENTAGE
+				FROM PAY_DETAIL
+		WHERE PAY_KEY = (SELECT PAY_KEY FROM PAY WHERE RECEIPT_KEY 
+		                = (SELECT RECEIPT_KEY FROM MEDICAL_CHART WHERE CHART_KEY = #{chartKey}))
+		AND PAY_KIND = 'PK03'
+	</select>
+	<select id="selectPayDetailDiagnosis" parameterType="string" resultType="kr.or.ddit.vo.PayDetailVO">
+		SELECT 
+				PAY_DETAIL_KEY
+				, PAY_KEY
+				, PAY_KIND
+				, PAY_COST
+				, PAY_PERCENTAGE
+				FROM PAY_DETAIL
+		WHERE PAY_KEY = (SELECT PAY_KEY FROM PAY WHERE RECEIPT_KEY 
+		                = (SELECT RECEIPT_KEY FROM MEDICAL_CHART WHERE CHART_KEY = #{chartKey}))
+		AND PAY_KIND = 'PK01'
+	</select>
+	
+	<update id="updatePrescritionPayDetail" parameterType="kr.or.ddit.vo.PayDetailVO">
+		UPDATE PAY_DETAIL SET
+		    PAY_COST=#{payCost, jdbcType=NUMERIC}
+		WHERE PAY_DETAIL_KEY=#{payDetailKey, jdbcType=VARCHAR}
+	</update>
+	
+	<insert id="insertRadiologyPayDetail" parameterType="kr.or.ddit.vo.PayDetailVO">
+		<selectKey order="BEFORE" keyProperty="payDetailKey" resultType="string"> 
+		SELECT 'PAY'|| LPAD(PAY_DIETAIL_SEQ.NEXTVAL, 3, '0') FROM DUAL
+		</selectKey>
+			INSERT INTO PAY_DETAIL(
+		       PAY_DETAIL_KEY
+		       , PAY_KEY
+		       , PAY_KIND
+		       , PAY_COST
+		       , PAY_PERCENTAGE
+		    ) VALUES (
+		        #{payDetailKey, jdbcType=VARCHAR}
+		        ,(SELECT PAY_KEY FROM PAY WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR})
+		        ,#{payKind, jdbcType=VARCHAR}
+		        ,(SELECT PAY_COST FROM STANDARD_OF_PAY
+			        WHERE PAY_KIND = #{payKind, jdbcType=VARCHAR})
+		        ,(SELECT PAY_PERCENTAGE FROM STANDARD_OF_PAY
+					WHERE PAY_KIND = #{payKind, jdbcType=VARCHAR})
+		    )
+	</insert>
+	
+	<resultMap type="kr.or.ddit.vo.PayVO" id="payWaitingMap" autoMapping="true">
+		<id property="payKey" column="PAY_KEY"/>
+		<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true">
+			<id property="patientKey" column="PATIENT_KEY"/>
+			<collection property="receiption" ofType="kr.or.ddit.vo.ReceiptionVO" autoMapping="true">
+				<id property="receiptKey" column="RECEIPT_KEY"/>
+				<collection property="MChartList" ofType="kr.or.ddit.vo.MedicalChartVO" autoMapping="true"/>
+			</collection>
+		</association>
+		<collection property="payDetailList" ofType="kr.or.ddit.vo.PayDetailVO" autoMapping="true"/>
+	</resultMap>
+	
+	
+	<select id="selectpayWaitingList" resultMap="payWaitingMap">
+		SELECT 
+		    P.PAY_KEY , P.RECEIPT_KEY , P.HOSPITALIZE_RECORD_KEY 
+		    , P.PAY_CHECK , P.PAY_DATE
+		    , P.PAY_TOTAL_COST
+		    
+		    , R.PATIENT_KEY, R.RECEIPT_STATUS
+		    , PAT.PATIENT_NAME, PAT.PATIENT_AGE
+		    , PAT.PATIENT_SEX,  PAT.PATIENT_REGNO1,  PAT.PATIENT_REGNO2
+		
+		    
+		    , PD.PAY_DETAIL_KEY, PD.PAY_KIND, ST.PAY_KIND_NAME, PD.PAY_COST, PD.PAY_PERCENTAGE
+		    
+		    
+		    , M.CHART_KEY, M.EMP_KEY, M.CHART_DATE, M.CHART_CONT
+		  
+		
+		FROM PAY P INNER JOIN PAY_DETAIL PD ON (P.PAY_KEY = PD.PAY_KEY)
+		    INNER JOIN STANDARD_OF_PAY ST ON (ST.PAY_KIND =  PD.PAY_KIND )
+		    INNER JOIN RECEIPT R ON (R.RECEIPT_KEY = P.RECEIPT_KEY)
+		    INNER JOIN MEDICAL_CHART M ON (R.RECEIPT_KEY = M.RECEIPT_KEY) 
+		    INNER JOIN PATIENT PAT ON (R.PATIENT_KEY = PAT.PATIENT_KEY)
+		    INNER JOIN WAITING_HISTORY W ON (W.RECEIPT_KEY = R.RECEIPT_KEY)
+		    WHERE R.RECEIPT_STATUS = 'RS01' AND W.WAITING_LOCATION = 'L008'
+		ORDER BY PAY_KEY DESC
+	</select>
+	
+	<select id="selectPayDetailList" parameterType="String" resultType="kr.or.ddit.vo.PayDetailVO">
+	        SELECT 
+			    PAY_DETAIL_KEY
+			    , PAY_KEY
+			    , PAY_KIND
+			    , (SELECT PAY_KIND_NAME FROM STANDARD_OF_PAY S WHERE S.PAY_KIND = P.PAY_KIND) AS PAY_KIND_NAME
+			    , PAY_COST
+			    , PAY_PERCENTAGE
+	            , CASE PAY_KIND WHEN 'PK03' THEN TRUNC(PAY_COST * ((100-PAY_PERCENTAGE)/100),-2) + 5000
+	                            WHEN 'PK04' THEN TRUNC(PAY_COST * ((100-PAY_PERCENTAGE)/100),-2) + 5000
+	                            ELSE  TRUNC(PAY_COST * ((100-PAY_PERCENTAGE)/100),-2)
+	            END AS PAY_COST_PATIENT 
+			FROM PAY_DETAIL P
+	        WHERE PAY_KEY = #{payKey}
+	</select>
+	
+	<update id="updatePayStatus" parameterType="kr.or.ddit.vo.PayVO">
+	    UPDATE PAY
+		SET
+		    PAY_CHECK = 1
+            , PAY_DATE = SYSDATE
+            , PAY_TOTAL_COST = #{payTotalCost}
+		WHERE
+		    PAY_KEY = #{payKey}
+	</update>
+	
+	<insert id="insertPay" parameterType="String">
+	INSERT INTO PAY(
+	    PAY_KEY
+	    , HOSPITALIZE_RECORD_KEY
+	    , PAY_CHECK
+	) VALUES (
+	    PAY_SEQ.NEXTVAL
+	    , #{hospitalizeRecordKey}
+	    , 0
+	)
+	</insert>
+</mapper>

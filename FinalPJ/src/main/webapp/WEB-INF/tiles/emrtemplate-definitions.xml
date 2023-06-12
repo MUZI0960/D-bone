@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC "-//Apache Software Foundation//DTD Tiles Configuration 3.0//EN" "http://tiles.apache.org/dtds/tiles-config_3_0.dtd" >
+<tiles-definitions>
+<!--   <definition name="parent" template="/WEB-INF/jsp/template_theme.jsp"> -->
+  <definition name="parent" template="/WEB-INF/jsp/template_theme_emr.jsp">
+  	<put-attribute name="title" value="FinalPJ" />
+  	
+  	<put-attribute name="preScript" value="/includee/preScript.jsp" />
+  	<put-attribute name="sidebar" value="/includee/sidebar.jsp" />
+  	<put-attribute name="topbar" value="/includee/topbar.jsp" />
+  	<put-attribute name="postScript" value="/includee/postScript.jsp" />
+  	<put-attribute name="footer" value="/includee/footer.jsp" />
+  	<put-attribute name="customizer" value="/includee/customizer.jsp" />
+  	<put-attribute name="patientDetail" value="/includee/patientDetail.jsp" />
+  	
+  </definition>
+
+  <definition name="index" extends="parent">
+  	<put-attribute name="body" value="/WEB-INF/jsp/index.jsp" />
+  </definition>
+  <definition name="MainPage/*" extends="parent">
+  	<put-attribute name="body" value="/WEB-INF/jsp/MainPage/{1}.jsp" />
+  </definition>
+  <definition name="MyPage/*" extends="parent">
+  	<put-attribute name="body" value="/WEB-INF/jsp/MyPage/{1}.jsp" />
+  </definition>
+  
+</tiles-definitions>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

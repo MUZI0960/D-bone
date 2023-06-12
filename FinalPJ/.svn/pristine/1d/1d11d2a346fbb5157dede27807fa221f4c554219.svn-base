@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.buyer.dao.BuyerDAO">
+	<resultMap type="kr.or.ddit.vo.BuyerVO" id="buyerMap" autoMapping="true">
+		<id property="buyerKey" column="BUYER_KEY" />
+		<collection property="officeSupplies" ofType="kr.or.ddit.vo.OfficeSuppliesVO" autoMapping="true">
+			<id property="suffliesKey" column="SUFFLIES_KEY"/>
+			<association property="buyer" javaType="kr.or.ddit.vo.BuyerVO" />
+			<collection property="officeSuppliesOrderRecod" ofType="kr.or.ddit.vo.OfficeSuppliesOrderRecodVO" autoMapping="true">
+        	</collection>
+		</collection>
+	</resultMap>
+	
+	<!-- 거래처 목록 조회 셀렉트문 -->
+	<select id="selectBuyerList" resultMap="buyerMap">
+		SELECT
+		    BUYER_KEY, BUYER_NAME, BUYER_TEL,
+		    BUYER_CHARGER, BUYER_EMAIL, CONTRACT_DATE,
+		    BUYER_STATUS, CONTRACT_END_DATE, BUYER_ADDRESS
+		FROM BUYER
+		ORDER BY BUYER_KEY ASC
+	</select>
+	
+	<!-- 거래처 상세 조회하는 셀렉트문 -->
+	<select id="selectBuyer" resultMap="buyerMap" parameterType="string">
+		SELECT
+		    BUYER_NAME,
+		    BUYER_TEL,
+		    BUYER_CHARGER,
+		    BUYER_EMAIL,
+		    CONTRACT_DATE,
+		    BUYER_STATUS,
+		    CONTRACT_END_DATE,
+		    BUYER_ADDRESS
+		FROM
+		    BUYER
+		WHERE   BUYER_KEY = #{buyerKey}
+	</select>
+	
+	<insert id="insertBuyer" parameterType="kr.or.ddit.vo.BuyerVO">
+		INSERT INTO buyer (
+		    buyer_key, buyer_name, buyer_tel
+		    , buyer_charger, buyer_email, contract_date
+		    , buyer_status, contract_end_date, buyer_address
+		) VALUES (
+		    BUYER_SEQ.NEXTVAL
+		    , #{buyerName, jdbcType=NUMERIC}
+		    , #{buyerTel, jdbcType=VARCHAR}
+		    , #{buyerCharger, jdbcType=VARCHAR}
+		    , #{buyerEmail, jdbcType=VARCHAR}
+		    , TO_DATE(#{contractDate, jdbcType=VARCHAR}, 'YY/MM/DD')
+	        , #{buyerStatus, jdbcType=VARCHAR}
+	        , TO_DATE(#{contractEndDate, jdbcType=VARCHAR}, 'YY/MM/DD')
+		    , #{buyerAddress, jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<update id="updateBuyer" parameterType="kr.or.ddit.vo.BuyerVO">
+	 UPDATE BUYER
+		SET
+		  BUYER_NAME = #{buyerName, jdbcType=VARCHAR}
+		  , BUYER_TEL = #{buyerTel, jdbcType=VARCHAR}
+		  , BUYER_CHARGER = #{buyerCharger, jdbcType=VARCHAR}
+		  , BUYER_EMAIL = #{buyerEmail, jdbcType=VARCHAR}
+		  , CONTRACT_DATE = TO_DATE(#{contractDate, jdbcType=VARCHAR}, 'YY/MM/DD')
+		  , BUYER_STATUS = #{buyerStatus, jdbcType=VARCHAR}
+		  , CONTRACT_END_DATE = TO_DATE(#{contractEndDate, jdbcType=VARCHAR}, 'YY/MM/DD')
+		  , BUYER_ADDRESS = #{buyerAddress, jdbcType=VARCHAR}
+		WHERE
+		  BUYER_KEY = #{buyerKey, jdbcType=NUMERIC}
+	</update>
+	
+	<!-- 의료 비품 리스트 -->
+	<select id="selectOfficeSuppliesList" resultType="kr.or.ddit.vo.OfficeSuppliesVO">
+		SELECT 
+			A.SUFFLIES_KEY
+			, A.SUFFLIES_NAME
+			, A.BUYER_KEY, B.BUYER_NAME
+			, A.SUFFLIES_STANDARD
+			, A.SUFFLIES_REMINDER
+			, A.LOCATION_KEY 
+			, A.SUFFLIES_COST
+		FROM OFFICE_SUPPLIES A LEFT OUTER JOIN BUYER B ON (A.BUYER_KEY = B.BUYER_KEY)
+		ORDER BY SUFFLIES_KEY ASC
+	</select>
+	
+	<!-- 비품 등록 -->
+	<insert id="insertOfficeSupplies" parameterType="kr.or.ddit.vo.OfficeSuppliesVO">
+		 INSERT INTO office_supplies (
+		    sufflies_key,
+		    sufflies_name,
+		    buyer_key,
+		    sufflies_standard,
+		    sufflies_reminder,
+		    location_key,
+		    SUFFLIES_COST
+		  ) VALUES (
+		    OFFICE_SUPPLIE_SEQ.NEXTVAL,
+		    #{suffliesName, jdbcType=VARCHAR},
+		    #{buyerKey, jdbcType=NUMERIC},
+		    #{suffliesStandard, jdbcType=VARCHAR},
+		    #{suffliesReminder, jdbcType=NUMERIC},
+		    #{locationKey, jdbcType=VARCHAR},
+		    #{suffliesCost, jdbcType=VARCHAR},
+		  )
+	</insert>
+	
+	<!-- 비품 상세 조회 -->
+	<select id="selectOfficeSupplies" resultType="kr.or.ddit.vo.OfficeSuppliesVO">
+		SELECT 
+			A.SUFFLIES_KEY
+			, A.SUFFLIES_NAME
+			, A.BUYER_KEY, B.BUYER_NAME
+			, A.SUFFLIES_STANDARD
+			, A.SUFFLIES_REMINDER
+			, A.LOCATION_KEY 
+			, A.SUFFLIES_COST
+		FROM OFFICE_SUPPLIES A LEFT OUTER JOIN BUYER B ON (A.BUYER_KEY = B.BUYER_KEY)
+        where a.SUFFLIES_KEY = #{suffliesKey, jdbcType=NUMERIC}
+	</select>
+	
+	
+    <!-- 비품 삭제 -->
+    <delete id="deleteOfficeSupplies"  parameterType="kr.or.ddit.vo.OfficeSuppliesVO">
+        DELETE FROM office_supplies
+        WHERE SUFFLIES_KEY = #{suffliesKey}
+    </delete>
+	
+	<!-- 비품 신청(등록) -->
+	<insert id="insertOfficeSuppliesOrderRecod" parameterType="kr.or.ddit.vo.OfficeSuppliesOrderRecodVO">
+	     INSERT INTO OFFICE_SUPPLIES_ORDER_RECORD (
+		    RECORD_KEY, SUFFLIES_KEY, ORDER_COUNT
+		  	, SUPPLIES_EA, SUPPLIES_PRICE, ORDER_REQUESTER
+		    , ORDER_DATE)
+		 VALUES (
+		    OFFICE_ORDER_RECORD_SEQ.NEXTVAL
+		    , #{suffliesKey}
+		    , #{orderCount}
+		    , #{suppliesEa}
+		    , #{suppliesPrice}
+		    , #{orderRequester}
+		    , SYSDATE
+		  )
+	</insert>
+	<update id="updateOfficeSuppliesOrderRecod" parameterType="kr.or.ddit.vo.OfficeSuppliesOrderRecodVO" >
+	  	  UPDATE OFFICE_SUPPLIES
+		   SET SUFFLIES_REMINDER = SUFFLIES_REMINDER +  #{orderCount}
+		   WHERE SUFFLIES_KEY = #{suffliesKey}
+	</update>
+	
+	<!-- 의료 비품 요청 목록 조회 -->
+	<select id="selectOfficeSuppliesOrderRecordList" resultType="kr.or.ddit.vo.OfficeSuppliesOrderRecodVO">
+		SELECT
+		    A.RECORD_KEY, A.SUFFLIES_KEY, A.ORDER_COUNT
+		    , A.SUPPLIES_EA, A.SUPPLIES_PRICE, A.ORDER_REQUESTER
+		    , A.ORDER_DATE, B.SUFFLIES_NAME
+		FROM OFFICE_SUPPLIES_ORDER_RECORD A LEFT OUTER JOIN OFFICE_SUPPLIES B ON (A.SUFFLIES_KEY = B.SUFFLIES_KEY)
+		ORDER BY ORDER_DATE DESC
+	</select>
+</mapper>

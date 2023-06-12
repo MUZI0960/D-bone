@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.poi.dao.PoiCostInsertDAO">
+
+
+	<insert id="insertDocPay" parameterType="kr.or.ddit.vo.PayDetailVO">
+		<selectKey order="BEFORE" keyProperty="payDetailKey" resultType="string">
+			SELECT 'PAY'|| LPAD(PAY_DIETAIL_SEQ.NEXTVAL, 3, '0') FROM DUAL
+		</selectKey>
+			INSERT INTO PAY_DETAIL
+			(
+				PAY_DETAIL_KEY
+				, PAY_KEY
+				, PAY_KIND
+				, PAY_COST
+				, PAY_PERCENTAGE
+			)
+			VALUES
+			(
+				#{payDetailKey, jdbcType=VARCHAR}
+				, (SELECT PAY_KEY FROM PAY WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR})
+				, 'PK11'
+				, 10000
+				, 0
+			)
+	</insert>
+	
+</mapper>

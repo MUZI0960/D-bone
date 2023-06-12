@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.reservation.dao.ReservationDAO">
+
+	<select id="selectWaitingPatientList" resultType="kr.or.ddit.vo.WaitingHospitalizationVO">
+		SELECT WAITING_KEY,WH.PATIENT_KEY, PATIENT_NAME, WARD_GRADE
+		FROM WAITING_HOSPITALIZATION WH LEFT OUTER JOIN PATIENT P ON (WH.PATIENT_KEY = P.PATIENT_KEY)
+        WHERE WH_STATUS = 0
+		ORDER BY WAITING_KEY 
+	</select>
+	
+	<select id="selectGradeList" resultType="kr.or.ddit.vo.CommonCodeVO">
+		SELECT CODE_NAME, CODE
+		FROM COMMON_CODE
+		WHERE CODE_DESCRIPTION = 'Grade'
+	</select>
+	
+	<update id="updateWardGrade" parameterType="kr.or.ddit.vo.WaitingHospitalizationVO">
+		UPDATE WAITING_HOSPITALIZATION
+		SET 
+		    WARD_GRADE = #{wardGrade}
+		 WHERE
+		    WAITING_KEY = #{waitingKey}
+	</update>
+	
+	<update id="updateReservationStatus" parameterType="String">
+		    
+		UPDATE WAITING_HOSPITALIZATION
+		SET
+		    WH_STATUS = 1
+		WHERE 
+		    WAITING_KEY = #{waitingKey}
+	
+	</update>
+</mapper>

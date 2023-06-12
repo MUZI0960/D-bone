@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.emp.dao.EmpUserDAO">
+
+
+	<select id="selectEmp" parameterType="string" resultType="kr.or.ddit.vo.EmpVO">
+		SELECT 
+		    EMP_KEY, EMP_ID, EMP_PASS, EMP_NAME, EMP_AGE, EMP_JOB, EMP_REGNO1
+		    , EMP_REGNO2, EMP_PHONE, EMP_ADDR, EMP_ADDR_DETAIL, EMP_HIRE_DATE
+		    , EMP_RETIRE_DATE, EMP_RETIRE_CHECK
+		    , EMP_FILE_GROUP_NO, EMP_LICENSE_NO
+		FROM EMP
+		WHERE EMP_ID = #{empId}
+	</select>
+</mapper>

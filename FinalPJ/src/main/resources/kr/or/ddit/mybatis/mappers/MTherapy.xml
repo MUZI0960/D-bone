@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.mTherapy.dao.MTherapyDAO">
+	
+	<resultMap type="kr.or.ddit.vo.ReceiptionVO" id="mtWaitingMap" autoMapping="true">
+		<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true">
+			<id property="patientKey" column="PATIENT_KEY"/>
+			<id property="patientName" column="PATIENT_NAME"/>
+			<id property="patientSex" column="PATIENT_SEX"/>
+			<id property="patientAge" column="PATIENT_AGE"/>
+		</association>
+		<collection property="WaitingList" ofType="kr.or.ddit.vo.WaitingHistoryVO" autoMapping="true"/>
+		<collection property="MChartList" ofType="kr.or.ddit.vo.MedicalChartVO" autoMapping="true">
+			<association property="dianosis"  javaType="kr.or.ddit.vo.DiagnosisVO" autoMapping="true">
+			<id property="chartKey" column="CHART_KEY" />
+			<association property="diease" javaType="kr.or.ddit.vo.DiseaseVO" autoMapping="true">
+				<id property="diseaseNmEn" column="DISEASE_NM_EN" /> 
+			</association>
+		</association>
+		</collection>
+	</resultMap>
+	
+	<select id="mtWaitingPatientList" resultMap="mtWaitingMap">
+		SELECT 
+		    P.PATIENT_KEY, 
+		    P.PATIENT_NAME, 
+		    P.PATIENT_AGE, 
+		    P.PATIENT_SEX,
+		    R.RECEIPT_KEY,
+		    MC.CHART_KEY, 
+		    WH.WAITING_KEY,
+		    WH.WAITING_STATUS,
+		    TO_CHAR(WH.WAITING_CHANGE_TIME,'HH24:MI PM' ) WAITING_CHANGE_TIME,
+		    MC.CHART_CONT,  
+		    OH.ORDER_KEY, 
+		    CC2.CODE_NAME BODY_PART_KEY,
+		    E.EMP_NAME,
+		    ME.EQUIPMENT_NAME, 
+		    ME.EQUIPMENT_KEY,
+		    CC3.CODE_NAME WAITING_STATUS_NAME
+		FROM PATIENT P 
+		
+		LEFT OUTER JOIN RECEIPT R ON P.PATIENT_KEY = R.PATIENT_KEY  
+		LEFT OUTER JOIN WAITING_HISTORY WH ON R.RECEIPT_KEY = WH.RECEIPT_KEY 
+		LEFT OUTER JOIN MEDICAL_CHART MC ON R.RECEIPT_KEY = MC.RECEIPT_KEY 
+		LEFT OUTER JOIN ORDER_HISTORY OH ON MC.CHART_KEY = OH.CHART_KEY 
+		LEFT OUTER JOIN EMP E ON E.EMP_KEY = MC.EMP_KEY 
+		LEFT OUTER JOIN MEDICLA_EQUIPMENT ME ON ME.EQUIPMENT_KEY = OH.EQUIPMENT_KEY 
+		LEFT OUTER JOIN COMMON_CODE CC1 ON CC1.CODE = R.OFFICE_KEY 
+		LEFT OUTER JOIN COMMON_CODE CC2 ON CC2.CODE = OH.BODY_PART_KEY 
+		LEFT OUTER JOIN COMMON_CODE CC3 ON CC3.CODE  = WH.WAITING_STATUS 
+		
+		WHERE WH.WAITING_LOCATION = 'L006'
+		AND OH.ORDER_KIND = 'O002'
+		
+		AND (P.PATIENT_KEY, WH.WAITING_CHANGE_TIME) IN (
+		    SELECT P.PATIENT_KEY, MAX(WH.WAITING_CHANGE_TIME)
+		    FROM PATIENT P 
+		    LEFT OUTER JOIN RECEIPT R ON P.PATIENT_KEY = R.PATIENT_KEY  
+		    LEFT OUTER JOIN WAITING_HISTORY WH ON R.RECEIPT_KEY = WH.RECEIPT_KEY 
+		    LEFT OUTER JOIN MEDICAL_CHART MC ON R.RECEIPT_KEY = MC.RECEIPT_KEY 
+		    LEFT OUTER JOIN ORDER_HISTORY OH ON MC.CHART_KEY = OH.CHART_KEY 
+		    LEFT OUTER JOIN EMP E ON E.EMP_KEY = MC.EMP_KEY 
+		    LEFT OUTER JOIN MEDICLA_EQUIPMENT ME ON ME.EQUIPMENT_KEY = OH.EQUIPMENT_KEY 
+		    LEFT OUTER JOIN COMMON_CODE CC1 ON CC1.CODE = R.OFFICE_KEY 
+		    LEFT OUTER JOIN COMMON_CODE CC2 ON CC2.CODE = OH.BODY_PART_KEY 
+		    LEFT OUTER JOIN COMMON_CODE CC3 ON CC3.CODE  = WH.WAITING_STATUS 
+		    WHERE WH.WAITING_LOCATION = 'L006'
+		    AND OH.ORDER_KIND = 'O002'
+		    GROUP BY P.PATIENT_KEY
+		)
+		
+		ORDER BY WH.WAITING_CHANGE_TIME
+	</select>
+	
+	<resultMap type="kr.or.ddit.vo.ReceiptionVO" id="patientChartMap" autoMapping="true">
+		<collection property="WaitingList" ofType="kr.or.ddit.vo.WaitingHistoryVO" autoMapping="true"/>
+		<collection property="MChartList" ofType="kr.or.ddit.vo.MedicalChartVO" autoMapping="true">
+			<association property="dianosis"  javaType="kr.or.ddit.vo.DiagnosisVO" autoMapping="true">
+			<id property="chartKey" column="CHART_KEY" />
+			<association property="diease" javaType="kr.or.ddit.vo.DiseaseVO" autoMapping="true">
+				<id property="diseaseNmEn" column="DISEASE_NM_EN" /> 
+				<id property="diseaseNmKr" column="DISEASE_NM_KR" /> 
+			</association>
+		</association>
+		<collection property="orderHistoryList" ofType="kr.or.ddit.vo.OrderHistoryVO" autoMapping="true" />
+		</collection>
+		<collection property="waitingList" ofType="kr.or.ddit.vo.WaitingHistoryVO" autoMapping="true"/>
+	</resultMap>
+	
+	<!-- 진료차트 -->
+	<select id="patientChartDetail" resultMap="patientChartMap" parameterType="string">
+		SELECT 
+			CHART_CONT
+			, MC.CHART_KEY 
+			,P.PATIENT_KEY 
+			,P.PATIENT_NAME
+			,P.PATIENT_REGNO1 
+			, (SELECT DISEASE_NM_KR FROM DISEASE WHERE DISEASE.DISEASE_KEY = D.DISEASE_KEY) AS DISEASE_NM_KR
+			, (SELECT DISEASE_NM_EN FROM DISEASE WHERE DISEASE.DISEASE_KEY = D.DISEASE_KEY) AS DISEASE_NM_EN
+			, (SELECT EMP_NAME FROM EMP WHERE EMP.EMP_KEY = MC.EMP_KEY) AS EMP_NAME
+			FROM MEDICAL_CHART MC LEFT OUTER JOIN ORDER_HISTORY OH ON(MC.CHART_KEY = OH.CHART_KEY)
+			                        LEFT OUTER JOIN DIAGNOSIS D ON (MC.CHART_KEY = D.CHART_KEY)
+			                        LEFT OUTER JOIN PATIENT P ON (MC.PATIENT_KEY = P.PATIENT_KEY)
+			WHERE MC.CHART_KEY = (
+			    SELECT CHART_KEY 
+			    FROM ORDER_HISTORY
+			    WHERE ORDER_KEY = #{orderKey}
+			) AND ORDER_KIND = 'O002'
+	</select>
+	
+	<!-- 치료시작, 치료기록 추가 -->
+	<insert id="mtRecordInsert" parameterType="kr.or.ddit.vo.MtRecordVO">
+		INSERT INTO MT_RECORD
+        (
+        	MT_RECORD_KEY, 
+        	ORDER_KEY, 
+        	MT_WRITER,
+        	MT_RECORD_DATE
+        )
+        VALUES 
+        (
+        	MT_RECORD_SEQ.NEXTVAL
+        	, #{orderKey, jdbcType=VARCHAR}
+        	, #{mtWriter, jdbcType=VARCHAR}
+        	, SYSDATE
+        )
+	</insert>
+	
+	<!-- 평가 업데이트 -->
+	<update id="mtRecordAssessUpdate" parameterType="kr.or.ddit.vo.MtRecordVO">
+		UPDATE MT_RECORD 
+        SET 
+        MT_STRENGTH = #{mtStrength, jdbcType=INTEGER}, 
+        MT_ROM = #{mtRom, jdbcType=INTEGER}, 
+        MT_PAIN = #{mtPain, jdbcType=INTEGER}, 
+        MT_BALANCE = #{mtBalance, jdbcType=INTEGER}
+        WHERE MT_RECORD_KEY = #{mtRecordKey, jdbcType=INTEGER}
+	</update>
+	
+	<!-- 치료 진행 시 필요한 데이터 출력 -->
+	<select id="mtStartPatientInfoDetail" resultMap="patientChartMap" parameterType="string">
+		SELECT 
+			P.PATIENT_KEY
+			, P.PATIENT_NAME
+			, P.PATIENT_AGE
+			, P.PATIENT_SEX
+			, DI.DISEASE_NM_EN
+			, WH.WAITING_STATUS 
+			, OH.ORDER_KEY 
+			, (SELECT 'MT_R'|| LPAD(MR.MT_RECORD_KEY, 5, '0') FROM DUAL) MT_RECORD_CODE
+			, TO_CHAR(MR.MT_RECORD_DATE, 'YYYY.MM.DD HH24:MI') MT_RECORD_DATE
+			, MR.MT_TIMES 
+			, OH.BODY_PART_KEY 
+		FROM MEDICAL_CHART MC
+		RIGHT OUTER JOIN ORDER_HISTORY OH ON OH.CHART_KEY = MC.CHART_KEY 
+		LEFT OUTER JOIN DIAGNOSIS D ON D.CHART_KEY = MC.CHART_KEY 
+		LEFT OUTER JOIN DISEASE DI ON DI.DISEASE_KEY = D.DISEASE_KEY 	
+		RIGHT OUTER JOIN RECEIPT R ON R.RECEIPT_KEY = MC.RECEIPT_KEY 
+		LEFT OUTER JOIN PATIENT P ON P.PATIENT_KEY = R.PATIENT_KEY 
+		LEFT OUTER JOIN WAITING_HISTORY WH ON WH.RECEIPT_KEY = R.RECEIPT_KEY 
+		LEFT OUTER JOIN MT_RECORD MR ON MR.ORDER_KEY = OH.ORDER_KEY 
+		WHERE OH.ORDER_KEY = #{orderKey} 
+	</select>
+	
+	<!-- 치료 평가 업데이트 -->
+	<update id="mtAssessmentUpdate" parameterType="kr.or.ddit.vo.MtRecordVO">
+		UPDATE MT_RECORD SET
+		MT_MMT = #{mtMmt, jdbcType=INTEGER}
+		, MT_ROM =#{mtRom, jdbcType=INTEGER}
+		, MT_PAIN =#{mtPain, jdbcType=INTEGER}
+		, MT_BBS = #{mtBbs, jdbcType=INTEGER}
+		, MT_RECORD_DATE = SYSDATE
+		WHERE ORDER_KEY = #{orderKey, jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 치료 계획 업데이트 -->
+	<update id="mtPlanUpdate" parameterType="kr.or.ddit.vo.MtRecordVO">
+		UPDATE MT_RECORD SET
+		MT_PLAN_S = #{mtPlanS, jdbcType=VARCHAR}
+		, MT_PLAN_O = #{mtPlanO, jdbcType=VARCHAR}
+		, MT_PLAN_A = #{mtPlanA, jdbcType=VARCHAR}
+		, MT_PLAN_P = #{mtPlanP, jdbcType=VARCHAR}
+		, MT_RECORD_DATE = SYSDATE
+		WHERE ORDER_KEY = #{orderKey, jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 치료 코멘트 업데이트 / 치료 종료 -->
+	<update id="mtCommentUpdate" parameterType="kr.or.ddit.vo.PtRecordVO">
+		UPDATE MT_RECORD SET
+		MT_RECORD_CONTENT = #{mtRecordContent, jdbcType=VARCHAR}
+		, MT_RECORD_DATE = SYSDATE
+		WHERE ORDER_KEY = #{orderKey, jdbcType=VARCHAR} 
+	</update>
+	
+	<!-- 치료중으로 상태변경 -->
+	<update id="mtHistoryUpdate" parameterType="string">
+		UPDATE WAITING_HISTORY SET
+			   WAITING_STATUS = 'WS03'
+		WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 수납대기로 상태변경 -->
+	<update id="waitingLocationUpdateToRE" parameterType="string">
+		UPDATE WAITING_HISTORY SET
+			   WAITING_STATUS = 'WS01'
+			   , WAITING_LOCATION = 'L008'
+			   , WAITING_CHANGE_TIME = SYSDATE
+		WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 평가 점수 차트 데이터 -->
+	<select id="mtChartDataList" resultType="kr.or.ddit.vo.MtRecordVO" parameterType="string">
+		SELECT 
+			MEDICAL_CHART.PATIENT_KEY
+			, A.MT_MMT
+			, A.MT_ROM
+			, A.MT_PAIN
+			, A.MT_BBS
+			, A.ORDER_KEY
+			, TO_CHAR(A.MT_RECORD_DATE, 'MM/DD HH24:MI') MT_RECORD_DATE
+			, A.CHART_KEY
+		FROM(
+			SELECT 
+				MT_RECORD.MT_MMT
+				, MT_RECORD.MT_ROM
+				, MT_RECORD.MT_PAIN
+				, MT_RECORD.MT_BBS
+				, MT_RECORD.ORDER_KEY
+				, MT_RECORD.MT_RECORD_KEY
+				, MT_RECORD.MT_RECORD_DATE
+				, ORDER_HISTORY.CHART_KEY  
+			FROM MT_RECORD, ORDER_HISTORY
+			WHERE MT_RECORD.ORDER_KEY = ORDER_HISTORY.ORDER_KEY 
+		)A, MEDICAL_CHART
+		WHERE A.CHART_KEY = MEDICAL_CHART.CHART_KEY
+		AND  MEDICAL_CHART.PATIENT_KEY = #{patientKey}
+		ORDER BY MT_RECORD_DATE ASC
+	</select>
+	
+	<!-- 환자별 지난 치료 히스토리 -->
+	<select id="mtRecHistoryList" resultType="kr.or.ddit.vo.MtRecordVO" parameterType="string">
+		SELECT ROWNUM, C.*
+			FROM (
+			  SELECT B.*, DI.DISEASE_NM_EN 
+			  FROM (
+			    SELECT A.*, MC.RECEIPT_KEY, MC.PATIENT_KEY 
+			    FROM (
+			      SELECT 
+			        MT_RECORD.MT_MMT,
+			        MT_RECORD.MT_ROM,
+			        MT_RECORD.MT_PAIN,
+			        MT_RECORD.MT_BBS,
+			        TO_CHAR(MT_RECORD.MT_RECORD_DATE, 'YYYY-MM-DD HH24:MI PM') AS MT_RECORD_DATE,
+			        MT_RECORD.MT_RECORD_CONTENT,
+			        MT_RECORD.MT_PLAN_S,
+			        MT_RECORD.MT_PLAN_O,
+			        MT_RECORD.MT_PLAN_A,
+			        MT_RECORD.MT_PLAN_P,
+			        MT_RECORD.ORDER_KEY,
+			        MT_RECORD.MT_RECORD_KEY,
+			        ORDER_HISTORY.CHART_KEY  
+			      FROM MT_RECORD, ORDER_HISTORY
+			      WHERE MT_RECORD.ORDER_KEY = ORDER_HISTORY.ORDER_KEY 
+			    ) A 
+			    LEFT OUTER JOIN MEDICAL_CHART MC ON A.CHART_KEY = MC.CHART_KEY 
+			  ) B, DIAGNOSIS DA, DISEASE DI
+			  WHERE B.CHART_KEY = DA.CHART_KEY
+			  AND DI.DISEASE_KEY = DA.DISEASE_KEY
+			  AND B.PATIENT_KEY = #{patientKey}
+			  ORDER BY B.MT_RECORD_DATE DESC
+			) C
+	</select>
+	
+	<!-- 수납 상세 추가 -->
+	<insert id="mtPayDetailInsert" parameterType="kr.or.ddit.vo.PayDetailVO">
+	<selectKey order="BEFORE" keyProperty="payDetailKey" resultType="string">
+		SELECT 'PAY'|| LPAD(PAY_DIETAIL_SEQ.NEXTVAL, 3, '0') FROM DUAL
+	</selectKey>
+		INSERT INTO PAY_DETAIL
+		(
+			PAY_DETAIL_KEY
+			, PAY_KEY
+			, PAY_KIND
+			, PAY_COST
+			, PAY_PERCENTAGE
+		)
+		VALUES
+		(
+			#{payDetailKey, jdbcType=VARCHAR}
+			, (SELECT PAY_KEY FROM PAY WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR})
+			, 'PK10'
+			, 100000
+			, 0
+		)
+	</insert>
+	
+</mapper>
+
+
+
+
+
+
+
+
+
+

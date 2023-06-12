@@ -1,0 +1,2 @@
+javax.validation.constraints.NotBlank.message=\ud544\uc218\ub370\uc774\ud130[{0}] \ub204\ub77d
+javax.validation.constraints.Size.message={0}\uc785\ub825\uac12[${validatedValue}]-\ud06c\uae30({min}~{max})\ud655\uc778

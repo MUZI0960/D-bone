@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.noticeBoard.dao.NoticeBoardDAO">
+
+<select id="noticeBoardList" resultType="kr.or.ddit.vo.NoticeBoardVO">
+	SELECT B.*
+	FROM (
+		SELECT ROWNUM RNUM, A.*
+		 FROM(
+				SELECT 
+					BOARD_KEY
+					,BOARD_TITLE
+					, EMP_NAME
+					, BOARD_HIT
+					, TO_CHAR(BOARD_DATE,'YYYY.MM.DD HH24:MI PM' ) BOARD_DATE
+				FROM NOTICE_BOARD, EMP
+				WHERE BOARD_WRITER = EMP_KEY
+				ORDER BY BOARD_DATE DESC
+			) A
+	)B
+	<![CDATA[
+		WHERE RNUM >= #{startRow} AND RNUM <= #{endRow}
+	]]>
+</select>
+
+<select id="selectTotalRecord" parameterType="kr.or.ddit.vo.Pagination" resultType="int">
+	SELECT COUNT(*)
+	FROM NOTICE_BOARD
+</select>
+
+<insert id="noticeBoardInsert" parameterType="kr.or.ddit.vo.NoticeBoardVO">
+	INSERT INTO NOTICE_BOARD (
+	    BOARD_KEY, 
+	    BOARD_TITLE, 
+	    BOARD_WRITER, 
+	    BOARD_CONTENT, 
+	    BOARD_HIT, 
+	    BOARD_DATE
+	) VALUES (
+	    NOTICE_BOARD_SEQ.NEXTVAL
+		, #{boardTitle,jdbcType=VARCHAR}
+		, #{boardWriter,jdbcType=VARCHAR}
+		, #{boardContent,jdbcType=CLOB}
+		, 0
+		, SYSDATE
+	)
+</insert>
+
+<select id="noticeBoardDetail" resultType="kr.or.ddit.vo.NoticeBoardVO" parameterType="int">
+	SELECT 
+	    BOARD_KEY
+	    , BOARD_TITLE
+	    , EMP_NAME
+	    , BOARD_WRITER
+	    , BOARD_CONTENT
+	    , BOARD_HIT
+	    , BOARD_DATE
+	    , BOARD_FILE_GROUP_NO
+	FROM NOTICE_BOARD, EMP
+	WHERE BOARD_KEY = #{boardKey} AND BOARD_WRITER = EMP_KEY
+</select>
+
+<update id="noticeBoardUpdate" parameterType="kr.or.ddit.vo.NoticeBoardVO">
+	UPDATE NOTICE_BOARD
+	SET
+    	BOARD_TITLE = #{boardTitle,jdbcType=VARCHAR}, 
+        BOARD_CONTENT = #{boardContent,jdbcType=CLOB}, 
+        BOARD_HIT = 1, 
+        BOARD_DATE = SYSDATE
+	WHERE BOARD_KEY = #{boardKey}
+</update>
+
+<delete id="noticeBoardDelete" parameterType="int">
+	DELETE FROM NOTICE_BOARD
+	WHERE BOARD_KEY = #{boardKey}
+</delete>
+
+<update id="updateNoticeBoardHit" parameterType="int">
+	UPDATE NOTICE_BOARD
+	SET
+	BOARD_HIT = BOARD_HIT + 1
+	WHERE BOARD_KEY = #{boardKey}
+</update>
+
+<!-- 월별 방문자 통계 -->
+<select id="chartMonthVisitData" resultType="kr.or.ddit.vo.ReceiptionVO">
+    SELECT
+        TO_CHAR(RECEIPT_DATE , 'MM') AS MONTH_DATA
+        , COUNT(RECEIPT_KEY) AS RECEIPT_KEY
+    FROM RECEIPT 
+    GROUP BY TO_CHAR(RECEIPT_DATE, 'MM')
+    ORDER BY TO_CHAR(RECEIPT_DATE, 'MM') 
+</select>
+
+<select id="chartMonthPayData" resultType="kr.or.ddit.vo.PayVO">
+	SELECT
+		TO_CHAR(PAY_DATE, 'MM') AS PAY_MONTH
+	 	, SUM(PAY_TOTAL_COST) AS SUM_COST
+	 	, TRUNC(AVG(PAY_TOTAL_COST)) AS AVG_COST
+	FROM PAY 
+	WHERE PAY_TOTAL_COST IS NOT NULL
+	AND PAY_TOTAL_COST != 0
+	GROUP BY TO_CHAR(PAY_DATE, 'MM')
+	ORDER BY TO_CHAR(PAY_DATE, 'MM') 
+</select>
+
+</mapper>
+
+

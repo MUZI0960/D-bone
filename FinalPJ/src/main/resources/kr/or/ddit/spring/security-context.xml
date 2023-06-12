@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:c="http://www.springframework.org/schema/c"
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:security="http://www.springframework.org/schema/security"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-5.7.xsd">
+
+<!-- 	1. Filter, XML, In memory 기반의 인증구조 -->
+<!-- 	2. Role 기반의 선택적 랜더링 : ex) 관리자에게는 관리자에 맞는 메뉴구조 랜더링 , 커스텀 태그 사용 -->
+<!-- 	3. MVC 모든 레이어에서 인증 객체를 확보하는 방법 -->
+<!-- 	4. 데이터베이스 기반의 인증구조 -->
+<!-- 	5. 비밀 번호 단방향 암호화 -->
+<!-- 	6. 설정 커스터마이징 -->
+
+<!-- 	AuthenticationManager -> AuthenticationProvider(신원 확인) -> UserDetailService(사용자 조회) -->
+	<bean id="passwordEncoder" class="org.springframework.security.crypto.factory.PasswordEncoderFactories" 
+		factory-method="createDelegatingPasswordEncoder"
+	/>
+	<security:authentication-manager>
+		<security:authentication-provider user-service-ref="empDAO"><!-- coc로 첫문자만 대문자 -->
+<!-- 			<security:user-service> -->
+<!-- 				<security:user name="a001" password="java" authorities="ROLE_USER"/> -->
+<!-- 				<security:user name="c001" password="java" authorities="ROLE_ADMIN"/> -->
+<!-- 			</security:user-service> -->
+			<security:password-encoder ref="passwordEncoder" />
+		</security:authentication-provider>
+	</security:authentication-manager>
+
+	<bean id="authenticationFailureHandler" class="kr.or.ddit.security.handler.CustomAuthenticationFailureHandler" 
+		p:targetURL="/login.do"
+	/>
+	
+	<security:http pattern="/resources/**" security="none" /><!-- 정적자원은 보호 안받겠다. -->
+	
+	<security:http>
+		<security:form-login 
+			default-target-url="/welcome.do" always-use-default-target="true"
+			login-processing-url="/login.do"
+			login-page="/login.do"
+			username-parameter="empId"
+			password-parameter="empPass"
+			authentication-failure-handler-ref="authenticationFailureHandler"
+	
+		/>
+		<security:logout logout-url="/logout"/>
+<!-- 	AuthorizationManager -->
+		<security:intercept-url pattern="/" access="permitAll"/>
+		<security:intercept-url pattern="/login.do" access="permitAll"/>
+		<security:intercept-url pattern="/index.do" access="permitAll"/>
+		<security:intercept-url pattern="/detail" access="permitAll"/>
+		<security:intercept-url pattern="/main/receiptPayPage.*" access="hasAnyRole('ADMIN', 'MASTER')"/>
+		<security:intercept-url pattern="/main/reservationPage.*" access="hasAnyRole('NUS', 'MASTER')"/>
+		<security:intercept-url pattern="/main/chartPage.*" access="hasAnyRole('DOCTOR', 'MASTER')"/>
+		<security:intercept-url pattern="/main/wardPage.*" access="hasAnyRole('NUS','DOCTOR', 'MASTER')"/>
+		<security:intercept-url pattern="/main/productPage.*" access="hasAnyRole('ADMIN', 'MASTER')"/>
+		<security:intercept-url pattern="/main/medicine" access="hasAnyRole('NUS', 'MASTER')"/>
+		<security:intercept-url pattern="/main/surgeryPage.*" access="hasAnyRole('NUS','DOCTOR', 'MASTER')"/>
+		<security:intercept-url pattern="/main/therapyPage.*" access="hasAnyRole('MT', 'MASTER')"/>
+		<security:intercept-url pattern="/main/mTherapyPage.*" access="hasAnyRole('PT','MASTER')"/>
+		<security:intercept-url pattern="/main/radiologyPage.*" access="hasAnyRole('RAD','MASTER')"/>
+		<security:intercept-url pattern="/main/empPage.*" access="hasAnyRole('ADMIN','MASTER')"/>
+		<security:intercept-url pattern="/main/noticeBoardPage.*" access="permitAll"/>
+		<security:intercept-url pattern="/**" access="isAuthenticated()"/>
+		<security:access-denied-handler error-page="/error403Page"/>
+		<security:headers>
+			<security:frame-options policy="SAMEORIGIN"/>
+		</security:headers>
+		
+	</security:http>
+	
+</beans>
+
+
+
+
+
+
+
+
+
+
+
+
+

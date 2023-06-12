@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.radiology.dao.RadiologyDAO">
+
+
+<!-- 영상학과 -->
+	<resultMap type="kr.or.ddit.vo.WaitingHistoryVO" id="waitingMap" autoMapping="true">
+		<id property="waitingKey" column="WAITING_KEY"/>
+		<association property="receipt" javaType="kr.or.ddit.vo.ReceiptionVO" autoMapping="true">
+			<id property="receiptKey" column="RECEIPT_KEY"/>
+			<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true">
+				<id property="patientKey" column="PATIENT_KEY"/>
+				<association property="preDiagnosis" javaType="kr.or.ddit.vo.PreDiagnosisVO" autoMapping="true"/>
+			</association>
+			<collection property="MChartList" ofType="kr.or.ddit.vo.MedicalChartVO" autoMapping="true">
+				<id property="chartKey" column="CHART_KEY"/>
+				<collection property="prescriptList" ofType="kr.or.ddit.vo.PrescriptionVO" autoMapping="true"/>
+				<collection property="orderHistoryList" ofType="kr.or.ddit.vo.OrderHistoryVO" autoMapping="true"/>
+			</collection>
+		</association>
+	</resultMap>
+
+	<select id="selectWaitingList" resultMap="waitingMap">
+		SELECT DISTINCT(W.WAITING_KEY)    
+			, W.WAITING_KEY                                                                               
+			, W.WAITING_CHANGE_TIME
+			, C1.CODE_NAME AS WAITING_LOCATION_NAME
+			, W.WAITING_LOCATION
+			, W.WAITING_STATUS
+			, C2.CODE_NAME AS WAITING_STATUS_NAME 
+			
+			, R.RECEIPT_KEY
+			, R.OFFICE_KEY
+			, R.RECEIPT_DATE
+			, R.RECEIPT_REASON
+			, R.RECEIPT_STATUS
+			, C4.CODE_NAME AS RECEIPT_STATUS_NAME 
+			
+			, P.PATIENT_KEY, P.PATIENT_NAME, P.PATIENT_AGE
+			, P.PATIENT_SEX, P.PATIENT_REGNO1, P.PATIENT_REGNO2, P.PATIENT_PN, P.PATIENT_ADDRESS
+			, P.PATIENT_ADDRESS_DETAIL, P.PATIENT_TYPE, P.PATIENT_SIGNIFICANT
+			
+			, PRE.PRE_DIAGNOSIS_KEY, PRE.PRE_DIAGNOSIS_EXPERIENCE
+			, PRE.PRE_DIAGNOSIS_DISEASE, PRE.PRE_DIAGNOSIS_ALLERGY
+			, PRE.PRE_DIAGNOSIS_PREGNANCY
+			, PRE.PRE_DIAGNOSIS_CHOICE
+			, PRE.PRE_DIAGNOSIS_DATE,  PRE.PATIENT_KEY
+			
+			, M.CHART_KEY
+			, M.RECEIPT_KEY
+			, M.EMP_KEY
+			, E.EMP_NAME
+			, M.CHART_DATE
+			, M.CHART_CONT
+			
+			, O.ORDER_KEY, O.CHART_KEY, O.ORDER_KIND, O.BODY_PART_KEY, O.EQUIPMENT_KEY
+		
+		FROM WAITING_HISTORY W INNER JOIN RECEIPT R ON ( W.RECEIPT_KEY =  R.RECEIPT_KEY)
+		     INNER JOIN PATIENT P ON (P.PATIENT_KEY = R.PATIENT_KEY)
+		     LEFT OUTER JOIN COMMON_CODE C1 ON ( C1.CODE = W.WAITING_LOCATION) 
+		     LEFT OUTER JOIN COMMON_CODE C2 ON ( C2.CODE = W.WAITING_STATUS)
+		     LEFT OUTER JOIN COMMON_CODE C4 ON ( C4.CODE = R.RECEIPT_STATUS)
+		     LEFT OUTER JOIN PRE_DIAGNOSIS PRE ON (P.PATIENT_KEY = PRE.PATIENT_KEY)
+		     LEFT OUTER JOIN MEDICAL_CHART M ON (R.RECEIPT_KEY = M.RECEIPT_KEY)
+		     INNER JOIN ORDER_HISTORY O ON (O.CHART_KEY = M.CHART_KEY)
+		     LEFT OUTER JOIN EMP E ON (E.EMP_KEY = M. M.EMP_KEY)
+		WHERE WAITING_LOCATION = 'L005' AND W.WAITING_STATUS = 'WS01'
+			  AND ORDER_KIND IN ('O004' , 'O003')
+		      AND SUBSTR(TO_CHAR(WAITING_CHANGE_TIME),0,10) = SUBSTR(TO_CHAR(SYSDATE),0,10) 
+        ORDER BY WAITING_CHANGE_TIME ASC
+	</select>
+
+
+	<select id="selectRadiology" parameterType="string" resultType="kr.or.ddit.vo.RadiologyVO">
+		SELECT 
+		    A.RAD_RECODE
+		    , A.ORDER_KEY
+		    , A.ATT_GROUP_NO
+		    , A.RAD_CONT
+		    , A.RAD_RECORD_DATE
+		    , A.RAD_EMP
+		    , CASE WHEN B.ORDER_KIND = 'O004' THEN 'MRI'
+		           WHEN B.ORDER_KIND = 'O003' THEN 'x-Ray' END AS ORDER_KIND
+		    FROM RADIOLOGY A , ORDER_HISTORY B
+		WHERE A.ORDER_KEY = #{orderKey}
+		AND A.ORDER_KEY = B.ORDER_KEY
+	</select>
+
+	<insert id="insertXrayRadiology" parameterType="kr.or.ddit.vo.RadiologyVO">
+		INSERT INTO RADIOLOGY (
+		    RAD_RECODE
+		    , ORDER_KEY
+		    , ATT_GROUP_NO
+		    , RAD_CONT
+		    , RAD_RECORD_DATE
+		    , RAD_EMP
+		)VALUES(
+		    ('RAD'|| LPAD(RAD_SEQ.NEXTVAL, 3, '0'))
+		    , #{orderKey, jdbcType=VARCHAR}
+		    , #{attGroupNo, jdbcType=NUMERIC}
+		    , #{radCont, jdbcType=VARCHAR}
+		    , SYSDATE
+		    , #{radEmp, jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<update id="updateWaitingStatus" parameterType="string" >
+		UPDATE WAITING_HISTORY SET
+			WAITING_LOCATION = (SELECT OFFICE_KEY FROM RECEIPT 
+								WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR})
+			, WAITING_STATUS = 'WS05'
+		WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR}
+	</update>
+	
+	
+	<select id="selectRadData" parameterType="string" resultType="kr.or.ddit.vo.RadiologyVO">
+		SELECT R.RAD_RECODE, R.ORDER_KEY, R.ATT_GROUP_NO, R.RAD_CONT, R.RAD_RECORD_DATE, R.RAD_EMP 
+				, E.EMP_NAME
+	        FROM RADIOLOGY R INNER JOIN ORDER_HISTORY ORD ON ( R.ORDER_KEY = ORD.ORDER_KEY)
+			     INNER JOIN  MEDICAL_CHART M ON ( M.CHART_KEY = ORD.CHART_KEY)
+	             INNER JOIN EMP E ON (R.RAD_EMP = E.EMP_KEY)
+		WHERE RECEIPT_KEY =#{receiptKey}
+	</select>
+	
+	
+	<select id="selectRadDataForChartKey" parameterType="string" resultType="kr.or.ddit.vo.RadiologyVO">
+		 SELECT 
+            RAD_RECODE
+            , ORDER_KEY
+            , ATT_GROUP_NO
+            , RAD_CONT
+            , RAD_RECORD_DATE
+            , RAD_EMP
+        FROM RADIOLOGY
+        WHERE ORDER_KEY = (SELECT ORDER_KEY FROM ORDER_HISTORY
+		WHERE CHART_KEY = #{chartKey} AND ORDER_KIND IN('O003', 'O004'))
+	</select>
+</mapper>

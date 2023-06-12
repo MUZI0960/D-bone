@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.therapy.dao.TherapyDAO">
+
+	<resultMap type="kr.or.ddit.vo.ReceiptionVO" id="ptWaitingMap" autoMapping="true">
+		<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true">
+			<id property="patientKey" column="PATIENT_KEY"/>
+			<id property="patientName" column="PATIENT_NAME"/>
+			<id property="patientSex" column="PATIENT_SEX"/>
+			<id property="patientAge" column="PATIENT_AGE"/>
+		</association>
+		<collection property="WaitingList" ofType="kr.or.ddit.vo.WaitingHistoryVO" autoMapping="true"/>
+		<collection property="MChartList" ofType="kr.or.ddit.vo.MedicalChartVO" autoMapping="true" />
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.MedicalEquipmentVO" id="ptEquipmentMap" autoMapping="true">
+		<association property="buyerVO" javaType="kr.or.ddit.vo.BuyerVO" autoMapping="true">
+			<id property="buyerKey" column="BUYER_KEY"/>
+			<id property="buyerName" column="BUYER_NAME"/>
+			<id property="buyerTel" column="BUYER_TEL"/>
+			<id property="buyerCharger" column="BUYER_CHARGER"/>
+		</association>
+		<collection property="eqStatusRecVO" ofType="kr.or.ddit.vo.EquipmentStatusRecordVO" autoMapping="true" />
+	</resultMap>
+	
+	<resultMap id="equipmentStatusMap" type="kr.or.ddit.vo.MedicalChartVO" autoMapping="true">
+	  <result property="equipmentName" column="EQUIPMENT_NAME" />
+	  <result property="ptEquipmentCode" column="PT_EQUIPMENT_CODE" />
+	  <result property="equipmentStatus" column="EQUIPMENT_STATUS" />
+	  <result property="bodyName" column="BODY_NAME" />
+	  <result property="ptEquipmentKey" column="PT_EQUIPMENT_KEY" />
+	  <result property="ptEquipmentStatus" column="PT_EQUIPMENT_STATUS" />
+	</resultMap>
+	
+	<select id="ptWaitingPatientList" resultMap="ptWaitingMap">
+		SELECT 
+		    P.PATIENT_KEY, 
+		    P.PATIENT_NAME, 
+		    P.PATIENT_AGE, 
+		    P.PATIENT_SEX,
+		    R.RECEIPT_KEY,
+		    MC.CHART_KEY, 
+		    WH.WAITING_KEY,
+		    WH.WAITING_STATUS,
+		    TO_CHAR(WH.WAITING_CHANGE_TIME,'HH24:MI PM' ) WAITING_CHANGE_TIME,
+		    MC.CHART_CONT,  
+		    OH.ORDER_KEY, 
+		    CC2.CODE_NAME BODY_PART_KEY,
+		    E.EMP_NAME,
+		    ME.EQUIPMENT_NAME, 
+		    ME.EQUIPMENT_KEY,
+		    CC3.CODE_NAME WAITING_STATUS_NAME
+		FROM PATIENT P 
+		
+		LEFT OUTER JOIN RECEIPT R ON P.PATIENT_KEY = R.PATIENT_KEY  
+		LEFT OUTER JOIN WAITING_HISTORY WH ON R.RECEIPT_KEY = WH.RECEIPT_KEY 
+		LEFT OUTER JOIN MEDICAL_CHART MC ON R.RECEIPT_KEY = MC.RECEIPT_KEY 
+		LEFT OUTER JOIN ORDER_HISTORY OH ON MC.CHART_KEY = OH.CHART_KEY 
+		LEFT OUTER JOIN EMP E ON E.EMP_KEY = MC.EMP_KEY 
+		LEFT OUTER JOIN MEDICLA_EQUIPMENT ME ON ME.EQUIPMENT_KEY = OH.EQUIPMENT_KEY 
+		LEFT OUTER JOIN COMMON_CODE CC1 ON CC1.CODE = R.OFFICE_KEY 
+		LEFT OUTER JOIN COMMON_CODE CC2 ON CC2.CODE = OH.BODY_PART_KEY 
+		LEFT OUTER JOIN COMMON_CODE CC3 ON CC3.CODE  = WH.WAITING_STATUS 
+		
+		WHERE WH.WAITING_LOCATION = 'L004'
+		AND OH.ORDER_KIND = 'O001'
+		AND ME.EQUIPMENT_KEY IS NOT NULL
+		
+		AND (P.PATIENT_KEY, WH.WAITING_CHANGE_TIME) IN (
+		    SELECT P.PATIENT_KEY, MAX(WH.WAITING_CHANGE_TIME)
+		    FROM PATIENT P 
+		    LEFT OUTER JOIN RECEIPT R ON P.PATIENT_KEY = R.PATIENT_KEY  
+		    LEFT OUTER JOIN WAITING_HISTORY WH ON R.RECEIPT_KEY = WH.RECEIPT_KEY 
+		    LEFT OUTER JOIN MEDICAL_CHART MC ON R.RECEIPT_KEY = MC.RECEIPT_KEY 
+		    LEFT OUTER JOIN ORDER_HISTORY OH ON MC.CHART_KEY = OH.CHART_KEY 
+		    LEFT OUTER JOIN EMP E ON E.EMP_KEY = MC.EMP_KEY 
+		    LEFT OUTER JOIN MEDICLA_EQUIPMENT ME ON ME.EQUIPMENT_KEY = OH.EQUIPMENT_KEY 
+		    LEFT OUTER JOIN COMMON_CODE CC1 ON CC1.CODE = R.OFFICE_KEY 
+		    LEFT OUTER JOIN COMMON_CODE CC2 ON CC2.CODE = OH.BODY_PART_KEY 
+		    LEFT OUTER JOIN COMMON_CODE CC3 ON CC3.CODE  = WH.WAITING_STATUS 
+		    WHERE WH.WAITING_LOCATION = 'L004'
+		    AND OH.ORDER_KIND = 'O001'
+		    AND ME.EQUIPMENT_KEY IS NOT NULL
+		    GROUP BY P.PATIENT_KEY
+		)
+		
+		ORDER BY WH.WAITING_CHANGE_TIME
+	</select>
+	
+	<select id="ptEquipmentList" resultType="kr.or.ddit.vo.MedicalEquipmentVO">
+		SELECT 
+			EQUIPMENT_KEY, 
+			EQUIPMENT_NAME, 
+			EQUIPMENT_MODEL 
+		FROM MEDICLA_EQUIPMENT
+		WHERE EQUIPMENT_LOCATION != 'L005'
+	</select>
+	
+	<select id="ptEquipmentDetail" resultMap="ptEquipmentMap"  parameterType="int">
+		SELECT 
+			ME.EQUIPMENT_NAME, ME.EQUIPMENT_MODEL, 
+			B.BUYER_NAME, B.BUYER_CHARGER, B.BUYER_TEL   
+		FROM MEDICLA_EQUIPMENT ME, BUYER B
+		WHERE ME.BUYER_KEY = B.BUYER_KEY 
+		AND ME.EQUIPMENT_KEY = #{equipmentKey}
+	</select>
+	
+	<select id="ptEquipmentStatusList" resultMap="ptEquipmentMap" parameterType="int">
+		SELECT 
+			TO_CHAR(ER.EQUIPMENT_RECORD_DATE,'YY/MM/DD' ) EQUIPMENT_RECORD_DATE
+			, (SELECT CODE_NAME FROM COMMON_CODE C WHERE ER.EQUIPMENT_RECORD_STATUS = C.CODE) AS EQUIPMENT_RECORD_STATUS
+			, ER.EQUIPMENT_RECORD_CONTENT
+			, (SELECT EMP_NAME 
+				FROM EMP
+				WHERE EMP.EMP_KEY = ER.EQUIPMENT_RECORD_WRITER) AS EQUIPMENT_RECORD_WRITER
+		FROM EQUIPMENT_STATUS_RECORD ER, MEDICLA_EQUIPMENT ME
+		WHERE ER.EQUIPMENT_KEY = ME.EQUIPMENT_KEY 
+		AND ME.EQUIPMENT_KEY = #{equipmentKey}
+		ORDER BY ER.EQUIPMENT_RECORD_KEY DESC 
+	</select>	
+	
+	<insert id="ptEquipmentStatusInsert" parameterType="kr.or.ddit.vo.EquipmentStatusRecordVO">
+		INSERT INTO EQUIPMENT_STATUS_RECORD
+		(
+			EQUIPMENT_RECORD_KEY, 
+			EQUIPMENT_KEY, 
+			EQUIPMENT_RECORD_WRITER, 
+			EQUIPMENT_RECORD_STATUS, 
+			EQUIPMENT_RECORD_CONTENT, 
+			EQUIPMENT_RECORD_DATE
+		)
+		VALUES
+		(
+			EQUIPMENT_STATUS_RECORD_SEQ.NEXTVAL
+			, #{equipmentKey, jdbcType=INTEGER}
+			, #{equipmentRecordWriter, jdbcType=VARCHAR}
+			, #{equipmentRecordStatus,jdbcType=VARCHAR}
+			, #{equipmentRecordContent,jdbcType=VARCHAR}
+			, SYSDATE
+		)
+	</insert>
+	
+	<select id="ptEquipmentSelectList" resultMap="equipmentStatusMap" parameterType="string">
+		SELECT 
+			MEDICAL_CHART.PATIENT_KEY, 
+			MEDICLA_EQUIPMENT.EQUIPMENT_NAME, 
+			C1.CODE_NAME PT_EQUIPMENT_STATUS, 
+			PT_EQUIPMENT.PT_EQUIPMENT_CODE, 
+			MEDICLA_EQUIPMENT.EQUIPMENT_KEY,   
+			PT_EQUIPMENT.PT_EQUIPMENT_KEY,
+			ORDER_HISTORY.ORDER_KEY, 
+			PATIENT.PATIENT_NAME,
+			MEDICAL_CHART.RECEIPT_KEY 
+		FROM PT_EQUIPMENT
+		LEFT JOIN MEDICLA_EQUIPMENT ON PT_EQUIPMENT.EQUIPMENT_KEY = MEDICLA_EQUIPMENT.EQUIPMENT_KEY 
+		RIGHT OUTER JOIN ORDER_HISTORY ON ORDER_HISTORY.EQUIPMENT_KEY = MEDICLA_EQUIPMENT.EQUIPMENT_KEY 
+		RIGHT OUTER JOIN MEDICAL_CHART ON MEDICAL_CHART.CHART_KEY = ORDER_HISTORY.CHART_KEY 
+		RIGHT OUTER JOIN RECEIPT ON RECEIPT.RECEIPT_KEY  = MEDICAL_CHART.RECEIPT_KEY 
+		LEFT OUTER JOIN COMMON_CODE C1 ON C1.CODE = PT_EQUIPMENT.PT_EQUIPMENT_STATUS 
+		RIGHT OUTER JOIN PATIENT ON PATIENT.PATIENT_KEY = MEDICAL_CHART.PATIENT_KEY 
+		WHERE ORDER_HISTORY.ORDER_KIND ='O001'
+		AND PT_EQUIPMENT.PT_EQUIPMENT_STATUS = 'US01'
+		AND ORDER_HISTORY.ORDER_KEY =#{orderKey}
+<!-- 		AND MEDICAL_CHART.PATIENT_KEY = #{patientKey} -->
+		ORDER BY PT_EQUIPMENT.PT_EQUIPMENT_KEY 
+	</select>
+	
+	<!-- 침상상태 리스트 출력에 이것 썼다. -->
+	<select id="ptRoomStatusSelect" resultType="kr.or.ddit.vo.PtRoomVO">
+		SELECT 
+			PT_ROOM.PT_BED_KEY 
+			,PT_ROOM.PT_BED_STATUS
+			, PT_ROOM.ORDER_KEY
+			, PT_ROOM.PT_BED_STATUS_TIME  
+	    FROM PT_ROOM
+	</select>
+	
+	<update id="ptRoomStatusUpdate" parameterType="kr.or.ddit.vo.PtRoomVO">
+		UPDATE PT_ROOM 
+		SET PT_BED_STATUS = #{ptBedStatus, jdbcType=VARCHAR},
+		ORDER_KEY = #{orderKey, jdbcType=VARCHAR},
+		PT_EQUIPMENT_KEY = #{ptEquipmentKey, jdbcType=INTEGER},
+		PT_BED_STATUS_TIME = SYSDATE
+		WHERE PT_BED_KEY = #{ptBedKey, jdbcType=INTEGER}
+	</update>
+	
+	<update id="ptEuipmentStatusUpdate" parameterType="kr.or.ddit.vo.PtEquipmentVO">
+		UPDATE PT_EQUIPMENT 
+		SET PT_EQUIPMENT_STATUS = #{ptEquipmentStatus, jdbcType=VARCHAR}
+		WHERE PT_EQUIPMENT_KEY = #{ptEquipmentKey, jdbcType=INTEGER}
+	</update>
+	
+	<insert id="ptRecordInsert" parameterType="kr.or.ddit.vo.PtRecordVO">
+		INSERT INTO PT_RECORD
+		(
+			PT_RECORD_KEY, 
+			PT_BED_KEY, 
+			ORDER_KEY, 
+			EQUIPMENT_KEY, 
+			PT_RECORD_CONTENT, 
+			EMP_KEY, 
+			PT_RECORD_DATE
+		)
+		VALUES
+		(
+			PT_RECORD_SEQ.NEXTVAL
+			, #{ptBedKey, jdbcType=INTEGER}
+			, #{orderKey, jdbcType=VARCHAR}
+			, #{equipmentKey, jdbcType=INTEGER}
+			, ''
+			, #{empKey, jdbcType=VARCHAR}
+			, SYSDATE
+		)
+	</insert>
+	
+	<!-- 누구세요? -->
+	<select id="ptRoomSelectList" resultType="kr.or.ddit.vo.PtRoomVO">
+		SELECT PT_ROOM.PT_BED_KEY ,PT_ROOM.PT_BED_STATUS, PT_RECORD.ORDER_KEY  
+	    FROM PT_ROOM LEFT OUTER JOIN PT_RECORD
+	    ON PT_ROOM.PT_BED_KEY = PT_RECORD.PT_BED_KEY  
+	</select>
+	
+	<!-- 쓰는지 안쓰는지 체크 -->
+	<select id="nowPtBedStatusList" resultType="kr.or.ddit.vo.PtRecordVO">	
+		SELECT 
+			PT_ROOM.PT_BED_KEY 
+			, PT_ROOM.PT_BED_STATUS 
+<!-- 			, SUBSTR(TO_CHAR(PT_RECORD.PT_RECORD_DATE,'YYYYMMDD HH24:MI' ),10  ) PT_RECORD_DATE  -->
+			, PT_RECORD.PT_RECORD_DATE
+			, MEDICLA_EQUIPMENT.EQUIPMENT_NAME 
+			, PATIENT.PATIENT_NAME 
+			, PATIENT.PATIENT_AGE  
+			, PATIENT.PATIENT_SEX 
+			, DISEASE.DISEASE_NM_EN 
+			, EMP.EMP_NAME 
+			, PT_RECORD.PT_RECORD_CONTENT 
+			<!-- ORDER_KEY 가져오면 안된다. -->
+			,ORDER_HISTORY.ORDER_KEY 
+			
+		FROM PT_ROOM
+		LEFT OUTER JOIN PT_RECORD ON PT_RECORD.PT_BED_KEY = PT_ROOM.PT_BED_KEY 
+		LEFT OUTER JOIN ORDER_HISTORY ON PT_RECORD.ORDER_KEY  = ORDER_HISTORY.ORDER_KEY 
+		LEFT OUTER JOIN MEDICAL_CHART ON MEDICAL_CHART.CHART_KEY = ORDER_HISTORY.CHART_KEY
+		LEFT OUTER JOIN PATIENT ON MEDICAL_CHART.PATIENT_KEY = PATIENT.PATIENT_KEY 
+		LEFT OUTER JOIN EMP ON EMP.EMP_KEY = MEDICAL_CHART.EMP_KEY 
+		LEFT OUTER JOIN DIAGNOSIS ON DIAGNOSIS.CHART_KEY = MEDICAL_CHART.CHART_KEY 
+		LEFT OUTER JOIN DISEASE ON DISEASE.DISEASE_KEY = DIAGNOSIS.DISEASE_KEY 
+		LEFT OUTER JOIN MEDICLA_EQUIPMENT ON MEDICLA_EQUIPMENT.EQUIPMENT_KEY = ORDER_HISTORY.EQUIPMENT_KEY 
+		ORDER BY PT_ROOM.PT_BED_KEY
+	</select>	
+	
+	<select id="actingDetail" resultType="kr.or.ddit.vo.PtRecordVO" parameterType="string">
+		SELECT 
+		    P.PATIENT_NAME, 
+		    P.PATIENT_AGE, 
+		    P.PATIENT_SEX,
+		    R.RECEIPT_KEY,
+		    CC2.CODE_NAME BODY_PART_NAME,
+		    DI.DISEASE_NM_EN,
+		    (SELECT 'PT_R'|| LPAD(PR.PT_RECORD_KEY, 6, '0') FROM DUAL) PT_RECORD_CODE,
+<!-- 			PR.PT_RECORD_KEY, -->
+		    PT_RECORD_DATE,
+		    E.EMP_NAME,
+		    (SELECT EMP_NAME 
+			FROM EMP
+			WHERE EMP.EMP_KEY = PR.EMP_KEY) AS PT_NAME
+		FROM PATIENT P 
+		LEFT OUTER JOIN RECEIPT R ON P.PATIENT_KEY = R.PATIENT_KEY  
+		LEFT OUTER JOIN MEDICAL_CHART MC ON R.RECEIPT_KEY = MC.RECEIPT_KEY 
+		LEFT OUTER JOIN DIAGNOSIS DA ON DA.CHART_KEY = MC.CHART_KEY 
+		LEFT OUTER JOIN DISEASE DI ON DI.DISEASE_KEY = DA.DISEASE_KEY 
+		LEFT OUTER JOIN ORDER_HISTORY OH ON MC.CHART_KEY = OH.CHART_KEY 
+		LEFT OUTER JOIN EMP E ON E.EMP_KEY = MC.EMP_KEY 
+		LEFT OUTER JOIN COMMON_CODE CC2 ON CC2.CODE = OH.BODY_PART_KEY
+		
+		LEFT OUTER JOIN PT_RECORD PR ON PR.ORDER_KEY = OH.ORDER_KEY 
+		WHERE OH.ORDER_KEY = #{orderKey}
+	</select>
+	
+	<update id="actingCommentUpdate" parameterType="kr.or.ddit.vo.PtRecordVO">
+		UPDATE PT_RECORD 
+		SET PT_RECORD_CONTENT = #{ptRecordContent, jdbcType=CLOB}
+		WHERE PT_RECORD_KEY = #{ptRecordKey, jdbcType=INTEGER}
+	</update>
+	
+	<resultMap type="kr.or.ddit.vo.ReceiptionVO" id="patientChartMap" autoMapping="true">
+		<collection property="WaitingList" ofType="kr.or.ddit.vo.WaitingHistoryVO" autoMapping="true"/>
+		<collection property="MChartList" ofType="kr.or.ddit.vo.MedicalChartVO" autoMapping="true">
+			<association property="dianosis"  javaType="kr.or.ddit.vo.DiagnosisVO" autoMapping="true">
+			<id property="chartKey" column="CHART_KEY" />
+			<association property="diease" javaType="kr.or.ddit.vo.DiseaseVO" autoMapping="true">
+				<id property="diseaseNmEn" column="DISEASE_NM_EN" /> 
+				<id property="diseaseNmKr" column="DISEASE_NM_KR" /> 
+			</association>
+		</association>
+		<collection property="orderHistoryList" ofType="kr.or.ddit.vo.OrderHistoryVO" autoMapping="true" />
+		</collection>
+		<collection property="waitingList" ofType="kr.or.ddit.vo.WaitingHistoryVO" autoMapping="true"/>
+	</resultMap>
+	
+	<!-- 진료차트 -->
+	<select id="patientChartDetail" resultMap="patientChartMap" parameterType="string">
+		SELECT 
+			CHART_CONT
+			, MC.CHART_KEY 
+			,P.PATIENT_KEY 
+			,P.PATIENT_NAME
+			,P.PATIENT_REGNO1 
+			, (SELECT DISEASE_NM_KR FROM DISEASE WHERE DISEASE.DISEASE_KEY = D.DISEASE_KEY) AS DISEASE_NM_KR
+			, (SELECT DISEASE_NM_EN FROM DISEASE WHERE DISEASE.DISEASE_KEY = D.DISEASE_KEY) AS DISEASE_NM_EN
+			, (SELECT EMP_NAME FROM EMP WHERE EMP.EMP_KEY = MC.EMP_KEY) AS EMP_NAME
+			FROM MEDICAL_CHART MC LEFT OUTER JOIN ORDER_HISTORY OH ON(MC.CHART_KEY = OH.CHART_KEY)
+			                        LEFT OUTER JOIN DIAGNOSIS D ON (MC.CHART_KEY = D.CHART_KEY)
+			                        LEFT OUTER JOIN PATIENT P ON (MC.PATIENT_KEY = P.PATIENT_KEY)
+			WHERE MC.CHART_KEY = (
+			    SELECT CHART_KEY 
+			    FROM ORDER_HISTORY
+			    WHERE ORDER_KEY = #{orderKey}
+			) AND ORDER_KIND = 'O001'
+	</select>
+	
+	<update id="ptHistoryUpdate" parameterType="string">
+		UPDATE WAITING_HISTORY SET
+			   WAITING_STATUS = 'WS03'
+		WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR}
+	</update>
+	
+	
+	
+	<!-- 침상 상태 상세 조회 -->
+	<select id="ptBedStatusDetail" resultType="kr.or.ddit.vo.PtRecordVO" parameterType="string">
+		SELECT 
+	    	PR.PT_RECORD_DATE 
+	    	,(SELECT PT_BED_STATUS FROM PT_ROOM WHERE PR.PT_BED_KEY = PT_ROOM.PT_BED_KEY) AS PT_BED_STATUS
+	    	,(SELECT PT_EQUIPMENT_KEY FROM PT_ROOM WHERE PR.PT_BED_KEY = PT_ROOM.PT_BED_KEY) AS PT_EQUIPMENT_KEY
+	    	,(SELECT PT_BED_KEY FROM PT_ROOM WHERE PR.PT_BED_KEY = PT_ROOM.PT_BED_KEY) AS PT_BED_KEY
+	    	,(SELECT EQUIPMENT_KEY FROM ORDER_HISTORY WHERE PR.ORDER_KEY = ORDER_HISTORY.ORDER_KEY) AS EQUIPMENT_KEY
+			,(SELECT EQUIPMENT_NAME FROM MEDICLA_EQUIPMENT ME  JOIN ORDER_HISTORY OH 
+	   			ON ME.EQUIPMENT_KEY = OH.EQUIPMENT_KEY  WHERE OH.ORDER_KEY = #{orderKey}) AS EQUIPMENT_NAME
+	   		, (
+		  		SELECT P.PATIENT_NAME
+		   		FROM
+		   		(
+					SELECT MC.PATIENT_KEY 
+		    		FROM MEDICAL_CHART MC JOIN ORDER_HISTORY OH 
+		    		ON MC.CHART_KEY = OH.CHART_KEY 
+		    		WHERE OH.ORDER_KEY = #{orderKey}
+	        	) A, PATIENT P
+	        	WHERE P.PATIENT_KEY = A.PATIENT_KEY
+	        ) AS PATIENT_NAME	
+	    FROM PT_RECORD PR, ORDER_HISTORY OH
+	    WHERE PR.ORDER_KEY = OH.ORDER_KEY 
+	    AND OH.ORDER_KEY = #{orderKey}
+	</select>
+	
+	<!-- 수납대기로 상태변경 -->
+	<update id="waitingLocationUpdateToRE" parameterType="string">
+		UPDATE WAITING_HISTORY SET
+			   WAITING_STATUS = 'WS01'
+			   , WAITING_LOCATION = 'L008'
+			   , WAITING_CHANGE_TIME = SYSDATE
+		WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 도수대기로 상태변경 -->
+	<update id="waitingLocationUpdateToMT" parameterType="string">
+		UPDATE WAITING_HISTORY SET
+			   WAITING_STATUS = 'WS01'
+			   , WAITING_LOCATION = 'L006'
+			   , WAITING_CHANGE_TIME = SYSDATE
+		WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 접수번호에 따른 오더목록 -->
+	<select id="orderKindSelectList" parameterType="string" resultType="kr.or.ddit.vo.OrderHistoryVO">
+		SELECT MEDICAL_CHART.RECEIPT_KEY, ORDER_HISTORY.ORDER_KIND 
+		FROM ORDER_HISTORY, MEDICAL_CHART
+		WHERE ORDER_HISTORY.CHART_KEY = MEDICAL_CHART.CHART_KEY 
+		AND MEDICAL_CHART.RECEIPT_KEY = #{receiptKey}
+	</select>
+	
+	
+	<select id="ptEqStatusList" resultType="kr.or.ddit.vo.MedicalEquipmentVO">
+		SELECT 
+		MEDICLA_EQUIPMENT.EQUIPMENT_NAME,PT_EQUIPMENT.PT_EQUIPMENT_CODE, PT_EQUIPMENT.PT_EQUIPMENT_STATUS, PT_EQUIPMENT.EQUIPMENT_KEY 
+		FROM PT_EQUIPMENT, MEDICLA_EQUIPMENT
+		WHERE PT_EQUIPMENT.EQUIPMENT_KEY = MEDICLA_EQUIPMENT.EQUIPMENT_KEY
+	</select>
+	
+	<select id="nowPtEqStatusDetail" parameterType="int" resultType="kr.or.ddit.vo.PtEquipmentVO">
+		SELECT 
+			MEDICLA_EQUIPMENT.EQUIPMENT_NAME,
+			PT_EQUIPMENT.PT_EQUIPMENT_CODE, 
+			PT_EQUIPMENT.PT_EQUIPMENT_STATUS,
+			PT_EQUIPMENT.EQUIPMENT_KEY 
+		FROM PT_EQUIPMENT, MEDICLA_EQUIPMENT
+		WHERE PT_EQUIPMENT.EQUIPMENT_KEY = MEDICLA_EQUIPMENT.EQUIPMENT_KEY 
+		AND PT_EQUIPMENT.EQUIPMENT_KEY = #{equipmentKey}
+	</select>
+	
+	
+	<update id="ptEqDetailStatusUpdate" parameterType="kr.or.ddit.vo.PtEquipmentVO">
+		UPDATE PT_EQUIPMENT SET 
+		PT_EQUIPMENT_STATUS = #{ptEquipmentStatus, jdbcType=VARCHAR}
+		WHERE PT_EQUIPMENT_CODE = #{ptEquipmentCode, jdbcType=VARCHAR}
+	</update>
+	
+	<update id="eqDetailStatusUpdate" parameterType="kr.or.ddit.vo.MedicalEquipmentVO">
+		UPDATE MEDICLA_EQUIPMENT SET
+		EQUIPMENT_STATUS = #{equipmentStatus, jdbcType=VARCHAR}
+		WHERE EQUIPMENT_KEY = #{equipmentKey, jdbcType=INTEGER}
+	</update>
+	
+	
+	<!-- 수납 상세 추가 -->
+	<insert id="ptPayDetailInsert" parameterType="kr.or.ddit.vo.PayDetailVO">
+	<selectKey order="BEFORE" keyProperty="payDetailKey" resultType="string">
+		SELECT 'PAY'|| LPAD(PAY_DIETAIL_SEQ.NEXTVAL, 3, '0') FROM DUAL
+	</selectKey>
+		INSERT INTO PAY_DETAIL
+		(
+			PAY_DETAIL_KEY
+			, PAY_KEY
+			, PAY_KIND
+			, PAY_COST
+			, PAY_PERCENTAGE
+		)
+		VALUES
+		(
+			#{payDetailKey, jdbcType=VARCHAR}
+			, (SELECT PAY_KEY FROM PAY WHERE RECEIPT_KEY = #{receiptKey, jdbcType=VARCHAR})
+			, 'PK07'
+			, 10000
+			, 50
+		)
+	</insert>
+</mapper>

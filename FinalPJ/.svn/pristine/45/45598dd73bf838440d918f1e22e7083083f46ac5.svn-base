@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.preDiagnosis.dao.PreDiagnosisDAO">
+	<resultMap type="kr.or.ddit.vo.PreDiagnosisVO" id="preDiagnosisMap" autoMapping="true">
+		<id property="preDiagnosisKey" column="PRE_DIAGNOSIS_KEY"/>
+		<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true" />
+	</resultMap>
+
+	<!-- 예진표 등록 insert-->
+	<insert id="insertPreDiagnosis" parameterType="String">
+		INSERT INTO PRE_DIAGNOSIS (
+			pre_diagnosis_key
+			, patient_key
+		)VALUES(
+			PRE_DIAGNOSIS_SEQ.NEXTVAL
+			, #{patientKey}
+		)
+	</insert>
+	
+	<!-- 예진표 상세 조회 select문 -->
+	<select id="selectPreDiagnosis" resultType="kr.or.ddit.vo.PreDiagnosisVO" parameterType="string">
+		SELECT		
+			PRE_DIAGNOSIS_KEY
+			,PRE_DIAGNOSIS_EXPERIENCE
+			,PRE_DIAGNOSIS_DISEASE
+			,PRE_DIAGNOSIS_ALLERGY
+			,PRE_DIAGNOSIS_PREGNANCY
+			,PRE_DIAGNOSIS_CHOICE
+			,PRE_DIAGNOSIS_DATE
+		FROM PRE_DIAGNOSIS
+		WHERE PATIENT_KEY =#{patientKey}	
+	</select>
+	
+	<!-- 예진표 수정 update문 -->
+	<update id="updatePreDiagnosis" parameterType="kr.or.ddit.vo.PreDiagnosisVO">
+		UPDATE
+			PRE_DIAGNOSIS
+		SET
+			PRE_DIAGNOSIS_EXPERIENCE = #{preDiagnosisExperience, jdbcType=VARCHAR},
+			PRE_DIAGNOSIS_DISEASE = #{preDiagnosisDisease, jdbcType=VARCHAR},
+			PRE_DIAGNOSIS_ALLERGY = #{preDiagnosisAllergy, jdbcType=VARCHAR},
+			PRE_DIAGNOSIS_PREGNANCY = #{preDiagnosisPregnancy, jdbcType=VARCHAR},
+			PRE_DIAGNOSIS_CHOICE = #{preDiagnosisChoice, jdbcType=VARCHAR},
+			PRE_DIAGNOSIS_DATE = SYSDATE 
+		WHERE
+			PRE_DIAGNOSIS_KEY = #{preDiagnosisKey, jdbcType=VARCHAR}
+	</update>
+</mapper>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.reserve.dao.ReserveDAO">
+	<select id="selectReserve" resultType="kr.or.ddit.vo.ReserveVO">
+		SELECT SCHEDULE_KEY, PATIENT_KEY, WARD_BED_KEY, APPOINTMENT_DATE,
+		APPINTMENT_CHARGER FROM RESERVATION_SCHEDULE
+	</select>
+	
+	<update id="modifyReserve" parameterType="kr.or.ddit.vo.ReserveVO">
+		UPDATE
+			RESERVATION_SCHEDULE
+		SET
+			WARD_BED_KEY = #{wardBedKey},
+			APPINTMENT_CHARGER = #{appintmentCharger}
+		WHERE
+			SCHEDULE_KEY = #{scheduleKey}
+	</update>
+	
+<!-- 	<insert id=""> -->
+<!-- 		INSERT INTO RESERVATION_SCHEDULE -->
+<!-- 		(SCHEDULE_KEY, PATIENT_KEY, WARD_BED_KEY, APPOINTMENT_DATE, APPINTMENT_CHARGER) -->
+<!-- 		VALUES('B' || LPAD(reservation_seq.nextval, 5,'0'), 'P00027', 1, '2023-05-06', '카리나') -->
+<!-- 	</insert> -->
+</mapper>

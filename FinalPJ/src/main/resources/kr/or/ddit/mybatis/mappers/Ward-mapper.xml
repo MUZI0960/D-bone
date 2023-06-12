@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.ward.dao.WardDAO">
+
+	<resultMap type="kr.or.ddit.vo.HospitalizeRecordVO" id="hospitalizeRecordMap" autoMapping="true">
+		<association property="patient" javaType="kr.or.ddit.vo.PatientVO" autoMapping="true">
+			<id property="patientKey" column="PATIENT_KEY"/>
+	         <id property="patientName" column="PATIENT_NAME"/>
+	         <id property="patientSex" column="PATIENT_SEX"/>
+	         <id property="patientAge" column="PATIENT_AGE"/>
+	         <id property="patientTypeName" column="PATIENT_TYPE_NAME"/>
+		</association>
+	</resultMap>
+
+	<resultMap type="kr.or.ddit.vo.AttatchFileGroupVO" id="attachMap">
+		<id property="attGroupNo" column="ATT_GROUP_NO"/>
+		<collection property="attFileList" ofType="kr.or.ddit.vo.AttachVO" autoMapping="true"/>
+	</resultMap>
+
+	<resultMap type="kr.or.ddit.vo.MedicalChartVO" id="medicalChartMap" autoMapping="true">
+		<id property="chartKey" column="CHART_KEY"/>
+		<collection property="orderHistoryList" ofType="kr.or.ddit.vo.OrderHistoryVO" autoMapping="true"/>
+	</resultMap>
+	
+	<resultMap type="kr.or.ddit.vo.RoundsRecordVO" id="roundsRecordMap" autoMapping="true">
+		<id property="roundsRecordKey" column="ROUNDS_RECORD_KEY" />
+		<collection property="roundsPrescriptionList" ofType="kr.or.ddit.vo.RoundsPrescriptionVO" autoMapping="true"/>
+	</resultMap>
+
+   
+   <select id="selectHospitalizePatientList" resultMap="hospitalizeRecordMap">
+			SELECT
+				HOSPITALIZE_RECORD_KEY
+				, HR.PATIENT_KEY
+				, PATIENT_NAME
+				, PATIENT_AGE
+				, PATIENT_SEX
+	            , PATIENT_REGNO1
+				, WARD_KEY
+                , (SELECT CODE_NAME FROM COMMON_CODE WHERE CODE=PATIENT_TYPE) AS PATIENT_TYPE_NAME
+                , ORDER_KEY
+			FROM HOSPITALIZE_RECORD HR LEFT OUTER JOIN PATIENT P ON (HR.PATIENT_KEY = P.PATIENT_KEY)    
+			                            LEFT OUTER JOIN WARD_BED WB ON (HR.WARD_BED_KEY = WB.WARD_BED_KEY)
+			WHERE CHECK_OUT_DATE IS NULL
+	</select>
+  
+	<select id="selectWardBedStatus" resultType="kr.or.ddit.vo.WardBedVO">
+
+		SELECT 
+		W.WARD_KEY 
+		, WB.WARD_BED_KEY
+		, (SELECT CODE_NAME FROM COMMON_CODE WHERE CODE = WARD_BED_STATUS) AS WARD_BED_STATUS
+		, (SELECT CODE_NAME FROM COMMON_CODE WHERE CODE = WARD_GRADE) AS WARD_GRADE
+		, PATIENT_NAME
+		, PATIENT_KEY
+		, HOSPITALIZE_RECORD_KEY
+		, EXPECTED_CHECK_OUT_DATE
+		, CHECK_IN_DATE
+		, TRUNC(SYSDATE - CHECK_IN_DATE) + 1 AS WARD_ING_DATE
+		FROM WARD_BED WB 
+		        RIGHT OUTER JOIN WARD W ON (WB.WARD_KEY = W.WARD_KEY)
+		        LEFT OUTER JOIN (    
+		            SELECT WARD_BED_KEY, PATIENT_NAME, CHECK_IN_DATE , EXPECTED_CHECK_OUT_DATE, HR.PATIENT_KEY, HOSPITALIZE_RECORD_KEY
+		            FROM HOSPITALIZE_RECORD HR LEFT OUTER JOIN PATIENT P ON (HR.PATIENT_KEY = P.PATIENT_KEY)
+		            WHERE EXPECTED_CHECK_OUT_DATE > SYSDATE AND CHECK_OUT_DATE IS NULL
+		    ) A ON (WB.WARD_BED_KEY = A.WARD_BED_KEY)
+		ORDER BY WARD_BED_KEY
+
+	</select>
+	
+	<select id="selectMedicalChart" parameterType="String" resultType="kr.or.ddit.vo.MedicalChartVO">
+		SELECT 
+			CHART_CONT
+			, (SELECT DISEASE_NM_KR FROM DISEASE WHERE DISEASE.DISEASE_KEY = D.DISEASE_KEY) AS DISEASE_NAME
+			, (SELECT SURGERY_KIND_NAME FROM SURGERY_KIND WHERE SURGERY_KIND_KEY = ORDER_KIND) AS ORDER_NAME
+			, (SELECT EMP_NAME FROM EMP WHERE EMP.EMP_KEY = MC.EMP_KEY) AS EMP_NAME
+			FROM MEDICAL_CHART MC LEFT OUTER JOIN ORDER_HISTORY OH ON(MC.CHART_KEY = OH.CHART_KEY)
+			                        LEFT OUTER JOIN DIAGNOSIS D ON (MC.CHART_KEY = D.CHART_KEY)
+			                        LEFT OUTER JOIN PATIENT P ON (MC.PATIENT_KEY = P.PATIENT_KEY)
+			WHERE MC.CHART_KEY = (
+			    SELECT CHART_KEY 
+			    FROM ORDER_HISTORY
+			    WHERE ORDER_KEY = #{orderKey}
+			) AND ORDER_KIND LIKE 'S%'
+	</select>
+	
+	<insert id="insertHospitalizeRecord" parameterType="kr.or.ddit.vo.HospitalizeRecordVO">
+		<selectKey resultType="string" keyProperty="hospitalizeRecordKey" order="BEFORE">
+	        SELECT 'HR' || LPAD(HOSPITALIZE_RECORD_SEQ.NEXTVAL, 5,'0') FROM DUAL
+	    </selectKey>   
+		
+         INSERT INTO HOSPITALIZE_RECORD (
+		    HOSPITALIZE_RECORD_KEY
+		    , PATIENT_KEY
+		    , WARD_BED_KEY
+		    , ORDER_KEY
+		    , HOSPITALIZE_DOCTOR_KEY
+		    , CHECK_IN_DATE
+		    , EXPECTED_CHECK_OUT_DATE
+		 )
+		SELECT 
+		     #{hospitalizeRecordKey}
+		    , A.*
+		FROM(
+		    SELECT 
+		        PATIENT_KEY
+		        , #{wardBedKey} AS WARD_BED_KEY
+		        , ORDER_KEY
+		        , EMP_KEY AS HOSPITALIZE_DOCTOR_KEY
+		        , SYSDATE AS CHECK_IN_DATE
+		        , SYSDATE + (SELECT SURGERY_HOSPITALIZE_AVG FROM SURGERY_KIND WHERE SURGERY_KIND_KEY=ORDER_KIND) AS EXPECTED_CHECK_OUT_DATE
+		    FROM MEDICAL_CHART MC LEFT OUTER JOIN ORDER_HISTORY OH ON (MC.CHART_KEY = OH.CHART_KEY)
+		    WHERE PATIENT_KEY = #{patientKey} AND ORDER_KIND LIKE 'S%'
+		    ORDER BY MC.CHART_KEY DESC
+		)A
+		WHERE ROWNUM = 1
+					
+	</insert>
+	
+	<insert id="insertNurseChart" parameterType="kr.or.ddit.vo.NurseChartVO">
+		
+		INSERT INTO NURSE_CHART(
+		    NURSE_CHART_KEY
+		    , HOSPITALIZE_RECORD_KEY
+		    , NURSE_CHART_WRITER
+		    , NURSE_CHART_DATE
+		    , NURSE_CHART_CONTENT
+		) VALUES (
+		    'N' || LPAD(NURSE_CHART_SEQ.NEXTVAL, 5, '0')
+		    , #{hospitalizeRecordKey}
+		    , #{nurseChartWriter}
+		    , SYSDATE
+		    , #{nurseChartContent}
+		)
+	</insert>
+	
+	<select id="selectDietKindList" resultType="kr.or.ddit.vo.CommonCodeVO">
+		SELECT
+		CODE, CODE_NAME
+		FROM COMMON_CODE
+		WHERE CODE_DESCRIPTION = 'Diet Kind'
+	</select>
+	
+	<insert id="insertDiet" parameterType="kr.or.ddit.vo.DietVO">
+		INSERT INTO DIET (
+		    DIET_KEY
+		    , HOSPITALIZE_RECORD_KEY
+		    , DIET_KIND
+		    , DIET_INTAKE
+		    , DIET_MEALS
+		    , DIET_WRITER
+		    , DIET_TIME
+		) VALUES (
+			'D' || LPAD(DIET_SEQ.NEXTVAL, 5, '0')
+		    , #{hospitalizeRecordKey}
+		    , #{dietKind}
+		    , #{dietIntake}
+		    , #{dietMeals}
+		    , #{dietWriter}
+		    , SYSDATE
+		)
+		
+	</insert>
+	
+	<select id="selectNurseChartList" parameterType="String" resultType="kr.or.ddit.vo.NurseChartVO">
+	 	SELECT 
+		    NURSE_CHART_KEY
+		    , (SELECT EMP_NAME FROM EMP WHERE EMP_KEY = NURSE_CHART_WRITER) AS EMP_NAME
+		    , NURSE_CHART_DATE
+		    , NURSE_CHART_CONTENT
+		FROM NURSE_CHART
+		WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+		ORDER BY NURSE_CHART_DATE DESC
+	</select>
+	
+	<select id="selectDietList" parameterType="String" resultType="kr.or.ddit.vo.DietVO">
+	 	SELECT
+		    DIET_KEY
+		    , (SELECT CODE_NAME FROM COMMON_CODE WHERE CODE = DIET_MEALS) AS DIET_MEALS_NAME
+		    , (SELECT CODE_NAME FROM COMMON_CODE WHERE CODE = DIET_KIND) AS DIET_KIND_NAME
+		    , DIET_INTAKE
+		    , (SELECT EMP_NAME FROM EMP WHERE EMP_KEY = DIET_WRITER) AS EMP_NAME
+		    , DIET_TIME
+		FROM DIET
+		WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+		ORDER BY DIET_TIME DESC
+	</select>
+	
+	<insert id="insertVital" parameterType="kr.or.ddit.vo.VitalVO">
+		INSERT INTO VITAL (
+		    VITAL_KEY
+		    , HOSPITALIZE_RECORD_KEY
+		    , HYPER_BP
+		    , HYPO_BP
+		    , PULSE
+		    , RESPIRATION
+		    , TEMPERATURE
+		    , VITAL_DATE
+		    , VITAL_WRITER
+		) VALUES (
+		    'V' || LPAD(VITAL_SEQ.NEXTVAL, 5, '0')
+		    , #{hospitalizeRecordKey}
+		    , #{hyperBP}
+		    , #{hypoBP}
+		    , #{pulse}
+		    , #{respiration}
+		    , #{temperature}
+		    , SYSDATE
+		    , #{vitalWriter}
+		)
+	</insert>
+	
+	<select id="selectVitalList" parameterType="kr.or.ddit.vo.VitalVO">
+		SELECT 
+		    VITAL_KEY
+		    , HYPER_BP
+		    , HYPO_BP
+		    , PULSE
+		    , RESPIRATION
+		    , TEMPERATURE
+		    , VITAL_DATE
+		FROM VITAL
+		WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+		ORDER BY VITAL_DATE DESC
+	</select>
+	
+	<insert id="insertIO" parameterType="kr.or.ddit.vo.IOVO">
+		INSERT INTO IO(
+		    IO_KEY
+		    , HOSPITALIZE_RECORD_KEY
+		    , IO_INTAKE
+		    , IO_OUTPUT
+		    , IO_WRITER
+		    , IO_DATE
+		) VALUES (
+		    'IO' || LPAD(IO_SEQ.NEXTVAL, 4, '0')
+		    , #{hospitalizeRecordKey}
+		    , #{ioIntake}
+		    , #{ioOutput}
+		    , #{ioWriter}
+		    , SYSDATE
+		)
+	</insert>
+	
+	<select id="selectIOList" parameterType="String" resultType="kr.or.ddit.vo.IOVO">
+		SELECT
+		    IO_KEY
+		    , IO_INTAKE
+		    , IO_OUTPUT
+		    , IO_DATE
+		FROM IO
+		WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+		ORDER BY IO_DATE DESC
+	</select>
+	
+	<select id="selectRoundsRecord" parameterType="String" resultMap="roundsRecordMap">
+		SELECT 
+			RR.ROUNDS_RECORD_KEY
+		    , M.MEDICINE_KEY
+		    , MEDICINE_NAME
+		    , RP_DAY
+		    , MEDICINE_EA
+		    , MEDICINE_ROUTE
+		FROM ROUNDS_RECORD RR LEFT OUTER JOIN ROUNDS_PRESCRIPTION RP ON(RR.ROUNDS_RECORD_KEY = RP.ROUNDS_RECORD_KEY)
+		                        LEFT OUTER JOIN MEDICINE M ON(RP.MEDICINE_KEY = M.MEDICINE_KEY)
+		WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+			AND TO_CHAR(ROUNDS_RECORD_DATE, 'YYYY-MM-DD') = TO_CHAR(SYSDATE, 'YYYY-MM-DD')
+	</select>
+
+	<select id="selectMedicineList" resultType="kr.or.ddit.vo.MedicineVO">
+		SELECT 
+		    MEDICINE_KEY
+		    , MEDICINE_NAME
+		    , MEDICINE_EA
+		    , MEDICINE_ROUTE
+		FROM MEDICINE
+	</select>	
+	
+	<insert id="insertRoundsRecord" parameterType="kr.or.ddit.vo.RoundsRecordVO" useGeneratedKeys="true" keyProperty="roundsRecordKey"
+		keyColumn="ROUNDS_RECORD_KEY">
+		INSERT INTO ROUNDS_RECORD (
+		    ROUNDS_RECORD_KEY
+		    , HOSPITALIZE_RECORD_KEY
+		    , ROUNDS_RECORD_DATE
+		    , ROUNDS_RECORD_WRITER
+		) VALUES (
+		    'R' || LPAD(ROUNDS_RECORD_SEQ.NEXTVAL, 5, '0')
+		    , #{hospitalizeRecordKey}
+		    , SYSDATE
+		    , #{roundsRecordWriter}
+		)
+	</insert>
+	
+	<insert id="insertRoundsPrescription" parameterType="kr.or.ddit.vo.RoundsPrescriptionVO">
+		INSERT INTO ROUNDS_PRESCRIPTION(
+		    RP_KEY
+		    , MEDICINE_KEY
+		    , ROUNDS_RECORD_KEY
+		    , RP_DAY
+		)VALUES(
+		    ROUNDS_PRESCRIPTION_SEQ.NEXTVAL
+		    , #{medicineKey}
+		    , #{roundsRecordKey}
+		    , #{rpDay}
+		)
+	</insert>
+	
+	<select id="selectRoundsRecordList" parameterType="String" resultMap="roundsRecordMap">
+		SELECT 
+			RR.ROUNDS_RECORD_KEY
+			, ROUNDS_RECORD_DATE
+			, ROUNDS_RECORD_WRITER
+			, (SELECT EMP_NAME FROM EMP WHERE EMP_KEY = ROUNDS_RECORD_WRITER) AS WRITER_NAME
+		    , M.MEDICINE_KEY
+		    , MEDICINE_NAME
+		    , RP_DAY
+		    , MEDICINE_EA
+		    , MEDICINE_ROUTE
+		FROM ROUNDS_RECORD RR LEFT OUTER JOIN ROUNDS_PRESCRIPTION RP ON(RR.ROUNDS_RECORD_KEY = RP.ROUNDS_RECORD_KEY)
+		                        LEFT OUTER JOIN MEDICINE M ON(RP.MEDICINE_KEY = M.MEDICINE_KEY)
+		WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+	</select>
+	
+	<insert id="insertMedicineRecord" parameterType="kr.or.ddit.vo.MedicineRecordVO">
+		INSERT INTO MEDICINE_RECORD(
+		    MEDICINE_RECORD_KEY
+		    , HOSPITALIZE_RECORD_KEY
+		    , MEDICINE_RECORD_CONTENT
+		    , MEDICINE_RECORD_DATE
+		    , MEDICINE_RECORD_WRITER
+		    , MEDICINE_KEY
+		)VALUES (
+		    'MR' || LPAD(MEDICINE_RECORD_SEQ.NEXTVAL, 4, '0')
+		    , #{hospitalizeRecordKey}
+		    , #{medicineRecordContent}
+		    , SYSDATE
+		    , #{medicineRecordWriter}
+		    , #{medicineKey}
+		)
+	</insert>
+	
+	<select id="selectMedicineRecordList" parameterType="String" resultType="kr.or.ddit.vo.MedicineRecordVO">
+		SELECT
+		    MEDICINE_RECORD_KEY
+		    , MEDICINE_RECORD_CONTENT
+		    , MEDICINE_RECORD_DATE
+		    , MEDICINE_RECORD_WRITER
+		    , (SELECT EMP_NAME FROM EMP WHERE EMP_KEY = MEDICINE_RECORD_WRITER) AS MEDICINE_RECORD_WRITER_NAME
+		    , MEDICINE_KEY
+		    , (SELECT MEDICINE_NAME FROM MEDICINE WHERE MEDICINE.MEDICINE_KEY = MEDICINE_RECORD.MEDICINE_KEY) AS MEDICINE_NAME
+		FROM MEDICINE_RECORD
+		WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+	</select>
+	
+	<update id="updateHospitalizeRecordDate" parameterType="String">
+		UPDATE HOSPITALIZE_RECORD
+		SET 
+		    CHECK_OUT_DATE = SYSDATE
+		WHERE 
+		    HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+	</update>
+	
+	<insert id="insertPayDetailDiet" parameterType="String">
+		INSERT INTO PAY_DETAIL (
+		    PAY_DETAIL_KEY
+		    , PAY_KEY
+		    , PAY_KIND
+		    , PAY_COST
+		    , PAY_PERCENTAGE
+		)
+		SELECT 
+		    'PAY' || LPAD(PAY_DIETAIL_SEQ.NEXTVAL,3,'0')
+		    , (SELECT PAY_KEY FROM PAY WHERE PAY.HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}) AS PAY_KEY
+		    , 'PK12'
+		    , A.*
+		    , 50
+		FROM(
+		    SELECT COUNT(*) * 4750
+		    FROM DIET
+		    WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+		)A
+	</insert>
+	
+	<insert id="insertWaitingHistory" parameterType="String">
+		INSERT INTO WAITING_HISTORY(
+		    WAITING_KEY
+		    , WAITING_CHANGE_TIME
+		    , WAITING_LOCATION
+		    , HOSPITALIZE_RECORD_KEY
+		)VALUES(
+		    WAITING_HISTORY_SEQ.NEXTVAL
+		    , SYSDATE
+		    , 'L008'
+		    , #{hospitalizeRecordKey}
+		)
+	</insert>
+	
+	<update id="decreaseMedicine" parameterType="String">
+		UPDATE MEDICINE
+		SET
+		    MEDICINE_REMINDER = MEDICINE_REMINDER-1
+		WHERE 
+		    MEDICINE_KEY = #{medicineKey}
+	</update>		
+	
+	<insert id="insertPayDetailMedicine" parameterType="String">
+		INSERT INTO PAY_DETAIL (
+		    PAY_DETAIL_KEY
+		    , PAY_KEY
+		    , PAY_KIND
+		    , PAY_COST
+		    , PAY_PERCENTAGE
+		)
+		SELECT 
+		    'PAY' || LPAD(PAY_DIETAIL_SEQ.NEXTVAL,3,'0')
+		    , (SELECT PAY_KEY FROM PAY WHERE PAY.HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}) AS PAY_KEY
+		    , 'PK03'
+		    , A.*
+		    , 30
+		FROM(
+		    SELECT NVL(SUM(MEDICINE_COST),0)
+            FROM MEDICINE_RECORD MR LEFT OUTER JOIN MEDICINE M ON (MR.MEDICINE_KEY = M.MEDICINE_KEY)
+            WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+		)A
+	</insert>
+	
+	<insert id="insertPayDetailHospitalization" parameterType="String">
+	INSERT INTO PAY_DETAIL (
+		    PAY_DETAIL_KEY
+		    , PAY_KEY
+		    , PAY_KIND
+		    , PAY_COST
+		    , PAY_PERCENTAGE
+		)
+		SELECT 
+		    'PAY' || LPAD(PAY_DIETAIL_SEQ.NEXTVAL,3,'0')
+		    , (SELECT PAY_KEY FROM PAY WHERE PAY.HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}) AS PAY_KEY
+		    , 'PK02'
+		    , A.*
+		    , 20
+		FROM(
+		    SELECT
+               CEIL(SYSDATE - CHECK_IN_DATE) * (SELECT WARD_PRICE FROM WARD WHERE WARD.WARD_KEY = WB.WARD_KEY)
+            FROM HOSPITALIZE_RECORD H
+                LEFT OUTER JOIN WARD_BED WB ON(H.WARD_BED_KEY = WB.WARD_BED_KEY)
+            WHERE HOSPITALIZE_RECORD_KEY = #{hospitalizeRecordKey}
+		)A
+	</insert>
+</mapper>
